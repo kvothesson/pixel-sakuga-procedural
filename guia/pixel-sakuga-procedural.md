@@ -352,3 +352,12 @@ El salto de paradigma recomendado en la sección 13. El mismo pixel art, pero ah
 - **Nada de símbolos que solo entiende el autor.** Dos rayitas sobre negro no se leen como ojos. El cierre ahora usa la misma imagen que el gancho (rima visual).
 - **Reflejos legibles.** Un charco visto desde arriba muestra solo los pies. Para que el reflejo cuente historia hace falta un **charco en primer plano** con cámara baja, reflejado sobre la línea de los pies.
 - **Storyboard antes que animatic.** `tools/storyboard.py` captura el instante clave de cada plano y `escenas/otra-vez-ep10/storyboard/` es la hoja con acción, cámara, sonido y lista de cosas a corregir por plano. Iterar ahí es barato.
+
+### Storyboard v2: correcciones que sirven para cualquier escena
+- **Capas = tela, no tubo** (feedback: "parece una chota colgando"). Una cadena angosta con la punta redonda que cuelga en el centro del cuerpo se lee como algo obsceno. Ahora la capa (`cloth:1`) es una tira poligonal que nace ancha en los hombros (19), se abre hacia abajo (30), va detrás del torso y termina en un ruedo recortado en zigzag, sin discos en las puntas.
+- **Girar solo la cabeza** (`ch.headYaw`): cara, ojos y pelo rotan alrededor de la cabeza y el cuerpo queda quieto. Para reacciones ("lo vieron"), girar el cuerpo entero se lee como otra acción.
+- **Caído = sentado** (pose `SIT`, con una mano apoyada atrás). Arrodillado se lee como agachado, listo para atacar.
+- **Congelarse = quedarse a mitad de un paso**, con un pie en el aire y un destello al trabarse. Una pose estable quieta no se lee como "congelado".
+- **Cut-in:** los ojos van en el centro de la franja y los textos en los bordes, siguiendo la inclinación de la franja.
+- **Grietas sobre un cuerpo:** se dibujan en una capa y se enmascaran con la silueta del personaje.
+- **Composición de grupo:** si dos personajes se tapan, se mueve la cámara (dentro del lado permitido por la regla de 180°) antes que los personajes.

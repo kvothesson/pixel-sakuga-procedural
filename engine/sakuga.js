@@ -469,7 +469,7 @@ function burnText(){
     if(small){ctx.font=`${size*.5}px ${FONT}`;ctx.lineWidth=size*.14;ctx.strokeText(small,W/2,y+size*.8);ctx.fillStyle='#ffd84a';ctx.fillText(small,W/2,y+size*.8)}};
   const sub=(scene.subs||[]).find(([a,c])=>E.t>=a&&E.t<c),hk=(scene.hook||[]).find(([a,c])=>E.t>=a&&E.t<c);
   if(hk&&Math.floor(E.t*6)%5!==4)draw(hk[2],hk[3],H*(scene.hookY??.15),W*.075,'#ffffff',scene.hookShadow||'#c4102a');
-  if(sub)draw(sub[2],sub[3],H*.8,W*.055,'#ffffff');
+  if(sub)draw(sub[2],sub[3],H*(scene.subY?scene.subY(E.t):.8),W*.055,'#ffffff');
 }
 E.setExport=function(on){E.exporting=on;if(on){E.PX=8;E.PW=135;E.PH=240;cv.width=1080;cv.height=1920;buf.width=layer.width=E.PW;buf.height=layer.height=E.PH;
   E.u=scene.vertical?E.PW/220:E.PH/420;E._simT=null}else resize()};

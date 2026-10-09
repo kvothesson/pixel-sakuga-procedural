@@ -57,11 +57,11 @@ const BLUE={head:'hood',pal:{coat:'#2a3270',coatD:'#1a1f48',pants:'#1e2244',pant
 const RED={head:'hair',pal:{coat:'#5a1628',coatD:'#3a0e1a',pants:'#2c121c',pantsD:'#200a12',boot:'#120508',skin:'#e6b892',glove:'#e6b892',hair:'#1e0812',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
   chains:[{key:'scarf',anchor:'chest',off:[-2,-3,0],n:7,len:8,w:[4,2],col:'scarf',grav:.9,damp:.88},{key:'pony',anchor:'head',off:[-6,-6,0],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}]};
 const GREEN={head:'hood',pal:{coat:'#184232',coatD:'#0e2a1f',pants:'#113024',pantsD:'#0b2219',boot:'#06120c',skin:'#0e1c16',neck:'#0e1c16',glove:'#9affc4',hood:'#184232',hair:'#184232',aura:'#5bff9e',dark:'#0f6a3a'},
-  chains:[{key:'cape',anchor:'chest',off:[-4,-2,0],n:7,len:9,w:[13,8],col:'coatD',grav:1.3,wind:.5,damp:.92}]};
+  chains:[{key:'cape',cloth:1,anchor:'chest',off:[-5,1,0],n:5,len:10,w:[19,30],col:'coatD',grav:1.3,wind:.5,damp:.92}]};
 const SHADE={head:'hair',pal:{coat:'#0a0810',coatD:'#06040a',pants:'#08060c',pantsD:'#050308',boot:'#030206',skin:'#0a0810',neck:'#0a0810',glove:'#cfc8e8',hair:'#0a0810',aura:'#e8e0ff',dark:'#000'},chains:[]};
 
 const ECHO={head:'hood',pal:{coat:'#0a0810',coatD:'#06040a',pants:'#08060c',pantsD:'#050308',boot:'#030206',skin:'#08060c',neck:'#08060c',glove:'#cfc8e8',hood:'#0a0810',hair:'#0a0810',aura:'#e8e0ff',dark:'#000'},
-  chains:[{key:'cape',anchor:'chest',off:[-4,-2,0],n:7,len:9,w:[13,8],col:'coatD',grav:1.3,wind:.5,damp:.92}]};
+  chains:[{key:'cape',cloth:1,anchor:'chest',off:[-5,1,0],n:5,len:10,w:[19,30],col:'coatD',grav:1.3,wind:.5,damp:.92}]};
 
 // =====================================================================
 // LA REGLA: el eco es el reflejo de Midori. Copia lo que él hace y DEVUELVE
@@ -69,8 +69,10 @@ const ECHO={head:'hood',pal:{coat:'#0a0810',coatD:'#06040a',pants:'#08060c',pant
 // GEOGRAFÍA (regla de 180°): héroes siempre a la izquierda, charco y eco a la derecha;
 // la cámara nunca cruza al otro lado (yaw entre −0,5 y 0,4).
 // =====================================================================
-const DELAY=.5,PUD=[0,0,28],PRX=58,PRZ=38,EX=14,EZ=8;
-const POS={red:[-64,16],blue:[-80,-14],green:[-26,0]};
+const DELAY=.5,PUD=[0,0,28],PRX=58,PRZ=38,EX=22,EZ=8;
+const POS={red:[-96,22],blue:[-62,-30],green:[-26,0]};
+const SIT={hip:[0,-12],chest:[-7,-38],head:[-5,-52],lE:[-15,-26],lH:[-21,-4],rE:[4,-29],rH:[11,-20],lK:[13,-17],lF:[24,0],rK:[9,-13],rF:[27,-2]};
+const MID={...P.walkA,lK:[-2,-28],lF:[-6,-10],rK:[9,-23],rF:[14,0],lE:[-12,-60],lH:[-20,-50],rE:[14,-60],rH:[24,-52]};
 const RAISE={...P.stance,rE:[12,-90],rH:[16,-114]},HOLD={...P.stance,lE:[-4,-74],lH:[8,-80],rE:[14,-74],rH:[4,-82]};
 const toward=(x,z,tx,tz)=>Math.atan2(tz-z,tx-x);
 const hero=(id,o={})=>({id,x:POS[id][0],z:POS[id][1],yaw:toward(POS[id][0],POS[id][1],PUD[0],PUD[2]),pose:P.stance,hoodDown:true,...o});
@@ -91,55 +93,55 @@ const SEQ=S.sequence([
   state:lt=>({split:[blink(lt,1.2,3.0),blink(lt,1.2+DELAY,3.0+DELAY)],label:'1 · gancho'})},
  // 2 — LA REGLA
  {id:'azotea',beats:8,info:['La azotea','Plano general: los tres en la azotea, el charco adelante de Midori.','General alto, de la izquierda (establece la geografía).','Lluvia, pad, hi-hat suave.'],
-  state:(lt,k)=>({chars:[hero('red'),hero('blue'),midori()],refl:{pose:P.stance},cam3:{...CAM.wide,yaw:lerp(-.3,-.18,k)},label:'2 · la azotea'})},
+  state:(lt,k)=>({chars:[hero('red'),hero('blue'),midori()],refl:{pose:P.stance},cam3:{...CAM.wide,yaw:lerp(.1,.2,k),tx:-40,zoom:.92},label:'2 · la azotea'})},
  {id:'mano',beats:8,info:['La regla','Midori levanta la mano. El reflejo la levanta medio segundo después. La baja; el reflejo la baja tarde.','Medio, bajo, con el charco en primer término.','Pad. Un "tic" agudo cuando el reflejo copia.'],
   state:lt=>{const pm=t=>S.keyPose(t,[[0,P.stance],[.8,RAISE],[2.6,P.stance]]);return{chars:[midori({pose:pm(lt)})],refl:{pose:pm(lt-DELAY)},near:1,cam3:CAM.pudd,label:'3 · la regla'}}},
  {id:'miran',beats:4,info:['Lo ven','Kurenai y Aoi giran la cabeza hacia Midori: lo vieron.','Medio corto de los dos.','"—¿Viste eso?"'],
-  state:lt=>({chars:[hero('red',{yaw:lt<.4?-.6:toward(-64,16,-26,0)}),hero('blue',{yaw:lt<.55?-.6:toward(-80,-14,-26,0)})],cam3:{yaw:-.45,pitch:.08,ty:-66,tx:-72,tz:0,D:190,zoom:1.7},label:'4 · lo ven'})},
+  state:lt=>({chars:[hero('red',{yaw:-.9,headYaw:lt<.4?-.9:.6}),hero('blue',{yaw:-.9,headYaw:lt<.55?-.9:.9})],cam3:{yaw:.25,pitch:.08,ty:-66,tx:-80,tz:-4,D:230,zoom:1.4},label:'4 · lo ven'})},
  // 3 — SALE
  {id:'sigue',beats:4,info:['Sigue solo','Midori está quieto. Su reflejo no: gira la cara hacia nosotros.','El mismo encuadre que el plano 3 (para comparar).','Silencio, un latido.'],
-  state:lt=>({chars:[midori()],refl:{pose:RAISE,yaw:lerp(0,Math.PI/2,ease(clamp(lt/1.2)))},near:1,cam3:CAM.pudd,label:'5 · sigue solo'})},
+  state:lt=>({chars:[midori()],refl:{pose:RAISE,yaw:lerp(0,Math.PI/2,ease(clamp(lt/1.2))),eyes:clamp((lt-.8)/.4)},near:1,cam3:CAM.pudd,label:'5 · sigue solo'})},
  {id:'sale',beats:10,info:['Sale','El reflejo sale del charco: una copia negra de Midori, de ojos blancos. Midori retrocede un paso.','General bajo de costado; tiembla.','Burbujeo grave que sube; entra el bajo.'],
-  state:lt=>({chars:[hero('red'),hero('blue'),midori({x:lerp(-26,-38,ease(clamp((lt-2.4)/.6))),pose:lt>2.4&&lt<3.2?P.crouch:P.stance}),echo({y:lerp(120,0,easeOut(clamp(lt/2.6))),rising:lt<2.6})],
-    cam3:{...CAM.side,pitch:.06,zoom:1.02,shake:lt<2.6?2:0},label:'6 · sale'})},
+  state:lt=>({chars:[hero('red'),hero('blue'),midori({x:lerp(-26,-46,ease(clamp((lt-2.4)/.6))),pose:lt>2.4&&lt<3.2?P.crouch:P.stance}),echo({y:lerp(120,0,easeOut(clamp(lt/2.6))),rising:lt<2.6})],
+    cam3:{...CAM.side,pitch:.08,zoom:.92,tx:-30,shake:lt<2.6?2:0},label:'6 · sale'})},
  {id:'cut_eco',beats:4,phase:'CUT',info:['El eco','Cut-in del eco con su nombre.','Franja diagonal sobre el plano del eco.','Platillo + franja que entra.'],
-  state:(lt,k)=>({chars:[echo()],cam3:{yaw:-.15,pitch:.04,ty:-70,tx:10,D:230,zoom:1.35},cut:{look:LOOK.echo,name:'残響 ECO',sub:'EL QUE LLEGA TARDE',col:'#e8e0ff',k},label:'7 · el eco'})},
+  state:(lt,k)=>({chars:[echo()],cam3:{yaw:-.15,pitch:.04,ty:-70,tx:10,D:230,zoom:1.35},cut:{look:LOOK.echo,name:'残響 ECO',sub:'LLEGA TARDE',col:'#e8e0ff',k},label:'7 · el eco'})},
  // 4 — ESCALADA
  {id:'kurenai',beats:6,info:['Kurenai ataca','Kurenai corre y le pega. El golpe entra, el eco ondula como agua y no se mueve. Medio segundo después le devuelve el MISMO golpe y la manda a volar.','General de costado (los dos en cuadro, de izquierda a derecha).','Batería completa. Golpe "tap" + ondas; el devuelto, más fuerte.'],
   state:lt=>{const red={id:'red',x:-64,z:0,yaw:0,pose:P.stance};
-    if(lt<1)Object.assign(red,(g=>({x:g.x,z:g.z,y:g.y,plant3:g.plant3,pose:lerpPose(P.runA,P.runB,g.swing)}))(S.gait3(lt*21,{x0:-64,z0:0,yaw:0,stride:92,lift:16,lead:.33,bob:3})));
-    else if(lt<1.7){red.x=-43;red.pose=S.keyPose(lt,[[1,P.crouch],[1.2,P.strike]])}
-    else{const k=clamp((lt-1.75)/.6);red.x=lerp(-43,-108,easeOut(k));red.y=-Math.sin(Math.PI*k)*24;red.pose=k<1?P.tuck:P.after}
+    if(lt<1)Object.assign(red,(g=>({x:g.x,z:g.z,y:g.y,plant3:g.plant3,pose:lerpPose(P.runA,P.runB,g.swing)}))(S.gait3(lt*(29+EX-14),{x0:-64,z0:0,yaw:0,stride:92,lift:16,lead:.33,bob:3})));
+    else if(lt<1.7){red.x=-43+(EX-14);red.pose=S.keyPose(lt,[[1,P.crouch],[1.2,P.strike]])}
+    else{const k=clamp((lt-1.75)/.6);red.x=lerp(-43-(EX-14),-112,easeOut(k));red.y=-Math.sin(Math.PI*k)*24;red.pose=k<1?P.tuck:P.after}
     const ep=S.keyPose(lt,[[0,P.stance],[1+DELAY,P.crouch],[1.2+DELAY,P.strike],[2.4,P.stance]]);
-    return{chars:[red,echo({pose:ep})],cam3:CAM.side,ripple:lt>=1.2&&lt<1.7?lt-1.2:null,spark:lt>=1.7&&lt<1.9?[-15,-74,0]:null,freeze:lt>=1.7&&lt<1.76?1.7:undefined,label:'8 · Kurenai ataca'}}},
+    return{chars:[red,echo({pose:ep})],cam3:CAM.side,ripple:lt>=1.2&&lt<1.7?lt-1.2:null,spark:lt>=1.7&&lt<1.85?[-20,-70,0]:null,freeze:lt>=1.7&&lt<1.76?1.7:undefined,label:'8 · Kurenai ataca'}}},
  {id:'devolvio',beats:4,info:['Lo devolvió','Kurenai en el piso, mira al eco: "¡Me lo devolvió!".','Medio desde atrás de Kurenai, el eco al fondo.','Bajo y hi-hat.'],
-  state:lt=>({chars:[{id:'red',x:-60,z:6,yaw:0,pose:P.kneel},echo()],cam3:{yaw:-.3,pitch:.1,ty:-50,tx:-40,tz:4,D:200,zoom:1.4},label:'9 · lo devolvió'})},
+  state:lt=>({chars:[{id:'red',x:-60,z:6,yaw:0,pose:SIT},echo()],cam3:{yaw:-.3,pitch:.1,ty:-50,tx:-40,tz:4,D:200,zoom:1.4},label:'9 · lo devolvió'})},
  {id:'aoi',beats:4,info:['Aoi dispara','Aoi carga y dispara un rayo azul al eco.','Medio de Aoi, rayo saliendo hacia la derecha.','Carga ascendente + rayo.'],
   state:lt=>{const a={id:'blue',x:-70,z:-6,yaw:0,hoodDown:true,pose:S.keyPose(lt,[[0,P.crouch],[.3,P.charge],[1,P.fire]])};
     return{chars:[a,echo()],beam:lt>=1?{from:'blue',k:clamp((lt-1)/.4)}:null,cam3:{yaw:-.25,pitch:.06,ty:-62,tx:-40,tz:-4,D:240,zoom:1.3},label:'10 · Aoi dispara'}}},
  {id:'rayo',beats:8,info:['El rayo vuelve','El rayo entra en el eco, que ondula. Medio segundo después dispara el MISMO rayo de vuelta. Los dos rayos chocan y el choque empuja hacia Aoi.','General de costado.','Choque de rayos zumbando, sube.'],
   state:lt=>{const a={id:'blue',x:-70,z:-6,yaw:0,hoodDown:true,pose:P.fire},e=echo({pose:S.keyPose(lt,[[0,P.stance],[DELAY,P.charge],[DELAY+.3,P.fire]])});
-    return{chars:[a,e,{id:'red',x:-104,z:14,yaw:0,pose:P.kneel}],beam:{from:'blue',k:1,clash:lt>=DELAY+.3?lerp(EX-20,-40,easeIn(clamp((lt-.8)/3))):null},ripple:lt<DELAY+.3?lt:null,cam3:CAM.side,label:'11 · el rayo vuelve'}}},
+    return{chars:[a,e,{id:'red',x:-122,z:34,yaw:0,pose:SIT}],beam:{from:'blue',k:1,clash:lt>=DELAY+.3?lerp(EX-20,-40,easeIn(clamp((lt-.8)/3))):null},ripple:lt<DELAY+.3?lt:null,cam3:CAM.side,label:'11 · el rayo vuelve'}}},
  {id:'cae',beats:4,info:['Cae Aoi','El choque le explota encima a Aoi y cae al lado de Kurenai.','General de costado; destello blanco.','Explosión; corta la batería.'],
-  state:lt=>{const k=clamp(lt/.6);return{chars:[{id:'blue',x:lerp(-70,-96,easeOut(k)),z:-6,y:-Math.sin(Math.PI*k)*20,yaw:0,hoodDown:true,pose:k<1?P.tuck:P.kneel},echo(),{id:'red',x:-104,z:14,yaw:0,pose:P.kneel}],
+  state:lt=>{const k=clamp(lt/.6);return{chars:[{id:'blue',x:lerp(-70,-94,easeOut(k)),z:lerp(-6,-24,k),y:-Math.sin(Math.PI*k)*20,yaw:0,hoodDown:true,pose:k<1?P.tuck:SIT},echo(),{id:'red',x:-122,z:34,yaw:0,pose:SIT}],
     flash:1-clamp(lt/.4),cam3:{...CAM.side,shake:lt<.4?6:0},label:'12 · cae Aoi'}}},
  // 5 — EL GIRO
  {id:'entiende',beats:6,phase:'SPLIT',info:['Entiende','Primer plano partido otra vez: Midori y su reflejo, ahora en sincronía. Midori entiende.','Igual al gancho (rima visual).','"—Es mi reflejo… Si no me muevo…"'],
   state:lt=>({split:[1,1],label:'13 · entiende'})},
  {id:'quieto',beats:8,info:['Quieto','Midori se para frente al eco y se congela con los brazos en guardia. El eco lo copia medio segundo tarde… y también se congela. Atrás, Kurenai y Aoi se levantan.','General de costado; nada se mueve salvo la lluvia.','Silencio total, solo lluvia y un latido.'],
-  state:lt=>{const g=midori({x:-30,z:-34,pose:S.keyPose(lt,[[0,P.stance],[.6,HOLD]])}),e=echo({pose:S.keyPose(lt,[[0,P.stance],[.6+DELAY,HOLD]])});
+  state:lt=>{const g=midori({x:-30,z:-34,pose:S.keyPose(lt,[[0,P.stance],[.6,MID]])}),e=echo({pose:S.keyPose(lt,[[0,P.stance],[.6+DELAY,MID]])});
     const up=t=>S.keyPose(lt,[[0,P.kneel],[t,P.crouch],[t+.4,P.stance]]);
-    return{chars:[g,e,{id:'red',x:-84,z:18,yaw:0,pose:up(2.2)},{id:'blue',x:-90,z:-12,yaw:0,hoodDown:true,pose:up(2.6)}],cam3:{...CAM.side,pitch:.16,zoom:1.02},label:'14 · quieto'}}},
+    return{chars:[g,e,{id:'red',x:-104,z:30,yaw:0,pose:up(2.2)},{id:'blue',x:-84,z:-40,yaw:0,hoodDown:true,pose:up(2.6)}],lock:[lt-.6,lt-.6-DELAY],cam3:{...CAM.side,pitch:.16,zoom:.98},label:'14 · quieto'}}},
  {id:'ahora',beats:4,phase:'CUT2',info:['¡Ahora!','Cut-in doble: Kurenai y Aoi.','Dos franjas cruzadas sobre el eco congelado.','Platillo; vuelve la batería.'],
-  state:(lt,k)=>({chars:[midori({x:-30,z:-34,pose:HOLD}),echo({pose:HOLD})],cam3:{...CAM.side,pitch:.16,zoom:1.02},cut2:k,label:'15 · ¡ahora!'})},
+  state:(lt,k)=>({chars:[midori({x:-30,z:-34,pose:MID}),echo({pose:MID})],cam3:{...CAM.side,pitch:.16,zoom:.98},cut2:k,label:'15 · ¡ahora!'})},
  // 6 — CLÍMAX
  {id:'golpe',beats:4,info:['Golpe doble','Kurenai y Aoi le pegan a la vez desde los dos lados. El eco está congelado copiando a Midori: no puede devolver nada.','General de costado: uno entra por cada lado.','Golpe doble + impact frames.'],
-  state:lt=>{if(lt>=.7)return{phase:'IMPACT',chars:[{id:'red',x:EX-42,z:EZ,yaw:0,pose:P.strike},{id:'blue',x:EX+42,z:EZ,yaw:Math.PI,hoodDown:true,pose:P.strike},echo({pose:HOLD})],cam3:{yaw:0,pitch:.12,ty:-62,tx:EX-6,tz:EZ,D:300,zoom:1.08},label:'16 · golpe doble'};
+  state:lt=>{if(lt>=.7)return{phase:'IMPACT',chars:[{id:'red',x:EX-42,z:EZ,yaw:0,pose:P.strike},{id:'blue',x:EX+42,z:EZ,yaw:Math.PI,hoodDown:true,pose:P.strike},echo({pose:MID})],cam3:{yaw:0,pitch:.12,ty:-62,tx:EX-6,tz:EZ,D:300,zoom:1.08},label:'16 · golpe doble'};
     const k=clamp(lt/.6),pr=S.keyPose(lt,[[0,P.crouch],[.55,P.strike]]);
-    return{chars:[midori({x:-30,z:-34,pose:HOLD}),{id:'red',x:lerp(EX-110,EX-42,easeIn(k)),z:EZ,yaw:0,pose:pr},{id:'blue',x:lerp(EX+110,EX+42,easeIn(k)),z:EZ,yaw:Math.PI,hoodDown:true,pose:pr},echo({pose:HOLD})],
+    return{chars:[{id:'red',x:lerp(EX-110,EX-42,easeIn(k)),z:EZ,yaw:0,pose:pr},{id:'blue',x:lerp(EX+110,EX+42,easeIn(k)),z:EZ,yaw:Math.PI,hoodDown:true,pose:pr},echo({pose:MID})],
       cam3:{yaw:0,pitch:.12,ty:-62,tx:EX-6,tz:EZ,D:300,zoom:1.08},freeze:lt>=.6&&lt<.7?.6:undefined,label:'16 · golpe doble'}}},
  {id:'rompe',beats:8,info:['Se rompe','El eco se agrieta como la superficie del agua, se deshace y vuelve al charco.','Medio bajo, de frente al eco.','Vidrio que se quiebra + ondas que se apagan.'],
-  state:lt=>({chars:[midori({x:-30,z:-34,pose:lt<1?HOLD:P.stance}),echo({pose:HOLD,dissolve:1-clamp((lt-1.2)/1.6),y:lt>2.6?lerp(0,110,easeIn(clamp((lt-2.6)/1.2))):0,rising:lt>2.6})],
+  state:lt=>({chars:[midori({x:-30,z:-34,pose:lt<1?HOLD:P.stance}),echo({pose:MID,dissolve:1-clamp((lt-1.2)/1.6),y:lt>2.6?lerp(0,110,easeIn(clamp((lt-2.6)/1.2))):0,rising:lt>2.6})],
     crack:clamp(lt/.6),cam3:{yaw:-.1,pitch:.2,ty:-55,tx:0,D:250,zoom:1.3},label:'17 · se rompe'})},
  // 7 — CIERRE Y LOOP
  {id:'calma',beats:6,info:['Calma','Midori levanta la mano otra vez. Su reflejo la levanta al mismo tiempo. Respira.','El mismo encuadre que el plano 3 (cierra la rima).','Pad suave, la batería se fue.'],
@@ -157,7 +159,7 @@ function split([top,bot]){
   const{PW,PH}=S,h=Math.floor(PH*.5),f=Math.floor(S.t*12);
   S.closeup(top,0,LOOK.green,{x:0,y:0,w:PW,h});
   const lay=S.withLayer(()=>S.closeup(bot,0,LOOK.green,{x:0,y:0,w:PW,h})),L=lay.getImageData(0,0,PW,h).data,b=S.ctx(),M=b.getImageData(0,h,PW,PH-h),m=M.data;
-  for(let y=0;y<PH-h;y++){const sy=Math.min(h-1,Math.round(y*.95)),w=Math.round(Math.sin(y*.45+f*.9)*1.4);
+  for(let y=0;y<PH-h;y++){const sy=Math.min(h-1,Math.round(y*.95)),w=Math.round(Math.sin(y*.25+f*.6)*.7);
     for(let x=0;x<PW;x++){const sx=Math.max(0,Math.min(PW-1,x+w)),si=((h-1-sy)*PW+sx)*4,o=(y*PW+x)*4;m[o]=L[si]*.5+6;m[o+1]=L[si+1]*.62+8;m[o+2]=L[si+2]*.8+22;m[o+3]=255}}
   b.putImageData(M,0,h);S.R(0,h,PW,1,'#8a80b0');
   const per=LOOP/24;for(let i=0;i<6;i++){const r=((S.t+i*per/6)%per)/per;S.ring(PW*(.15+S.hash(i)*.7),h+(PH-h)*(.25+S.hash(i+4)*.6),r*16,r*4,r<.5?'#6a6090':'#2a2440')}
@@ -165,42 +167,48 @@ function split([top,bot]){
 // charco: elipse en el piso; el reflejo de Midori (con su propio tiempo) se dibuja SOLO adentro
 function puddlePoly(){const pts=[];for(let i=0;i<28;i++){const a=i/28*Math.PI*2,p=S.proj(PUD[0]+Math.cos(a)*PRX,0,PUD[2]+Math.sin(a)*PRZ);pts.push([p[0],p[1]])}return pts}
 const inPoly=(pts,x,y)=>{let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const[xi,yi]=pts[i],[xj,yj]=pts[j];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c}return c};
-function nearPuddle(g){const[fx,fy]=S.proj(g.x,0,g.z||0),cy=fy+S.PH*.2,rx=S.PW*.62,ry=S.PH*.22,pts=[];
+function nearPuddle(g){const[fx,fy]=S.proj(g.x,0,g.z||0),cy=fy+S.PH*.32,rx=S.PW*.7,ry=S.PH*.34,pts=[];
   for(let i=0;i<32;i++){const a=i/32*Math.PI*2;pts.push([fx+Math.cos(a)*rx,Math.max(fy-1,cy+Math.sin(a)*ry)])}return pts}
-function puddle(s){const g=s.chars.find(c=>c.id==='green'),pts=s.near&&g?nearPuddle(g):puddlePoly();S.poly(pts,'#0b0716');
-  if(s.refl&&g){const ch={...g,pose:s.refl.pose,yaw:s.refl.yaw??g.yaw},lay=S.withLayer(()=>S.figure3(ch,'glow')),L=lay.getImageData(0,0,S.PW,S.PH).data,b=S.ctx(),M=b.getImageData(0,0,S.PW,S.PH),m=M.data,f=Math.floor(S.t*12);
+function puddle(s){const g=s.chars.find(c=>c.id==='green'),pts=s.near&&g?nearPuddle(g):puddlePoly();S.poly(pts,'#120c24');
+  if(s.refl&&g){const ch={...g,pose:s.refl.pose,yaw:s.refl.yaw??g.yaw},lay=S.withLayer(()=>{S.figure3(ch,'glow');if(s.refl.eyes>0){const K=S.cam3.K,h=S.to3(ch.pose).head;
+      for(const ez of[-3.5,3.5]){const e=S.proj(...S.w3(ch,[h[0]+5,h[1]-1,ez])),r=Math.max(1,Math.round(e[2]*K*1.4));S.ditherDisc(e[0],e[1],r*3,'#e8e0ff',.5*s.refl.eyes);S.R(e[0]-r,e[1]-r/2,r*2,Math.max(1,r),'#ffffff')}}}),L=lay.getImageData(0,0,S.PW,S.PH).data,b=S.ctx(),M=b.getImageData(0,0,S.PW,S.PH),m=M.data,f=Math.floor(S.t*12);
     const fy=Math.round(S.proj(g.x,0,g.z||0)[1]);
     for(let y=fy+1;y<S.PH;y++){const sy=2*fy-y;if(sy<0)break;const w=Math.round(Math.sin(y*.7+f*.9)*Math.min(1.5,(y-fy)/6));
       for(let x=0;x<S.PW;x++){if(!inPoly(pts,x+.5,y+.5))continue;const sx=x+w;if(sx<0||sx>=S.PW)continue;
       const si=(sy*S.PW+sx)*4;if(!L[si+3])continue;const o=(y*S.PW+x)*4;m[o]=L[si]*.6+4;m[o+1]=L[si+1]*.7+6;m[o+2]=L[si+2]*.85+18}}
     b.putImageData(M,0,0)}
-  for(let i=0;i<pts.length;i++){const a=pts[i],c=pts[(i+1)%pts.length];S.line(a[0],a[1],c[0],c[1],1,'#4a4070')}
+  for(let i=0;i<pts.length;i++){const a=pts[i],c=pts[(i+1)%pts.length];S.line(a[0],a[1],c[0],c[1],1,'#7a6aa8')}
   const per=LOOP/24;for(let i=0;i<4;i++){const r=((S.t+i*per/4)%per)/per,p=S.proj(PUD[0]+(S.hash(i)-.5)*PRX,0,PUD[2]+(S.hash(i+3)-.5)*PRZ),k=S.cam3.K*p[2];S.ring(p[0],p[1],r*9*k,r*2.5*k,r<.5?'#6a6090':'#2a2440')}
 }
 function drawChar(c){const fy=S.proj(c.x,0,c.z||0)[1],b=S.ctx(),body=()=>{if(c.rising){b.save();b.beginPath();b.rect(0,0,S.PW,Math.round(fy));b.clip();S.figure3(c,'glow');b.restore()}else S.figure3(c,'glow')};
   if(c.dissolve!==undefined&&c.dissolve<1)S.dissolve(c.dissolve,body);else body()}
 function render(s){
   const{disc,ring,seg}=S,t=S.t;
+  S.scene.el.sub.style.bottom=s.split?'44%':'17%';
   if(s.split){split(s.split);label(s);return}
   if(s.phase==='IMPACT'){S.impact3(st('golpe')+.7,...S.proj(EX,-74,EZ).slice(0,2),s.chars,'撃');label(s);return}
-  S.sky3(['#04030a','#08061a','#0e0a24','#1a0c26','#2a1024']);S.moon3(-.25,.15,S.PW*.13);S.skyline3();
+  S.sky3(['#04030a','#08061a','#0e0a24','#1a0c26','#2a1024']);S.moon3(.12,.13,S.PW*.11);S.skyline3();
   S.floor3('#150e1e','#2a1e3a',420,40);
   puddle(s);
   const live=s.chars.filter(c=>!(c.y<0)&&!c.rising&&c.dissolve===undefined);
   S.reflect3(live.filter(c=>!(s.refl&&c.id==='green')),.3);for(const c of live)S.shadow3(c);
   for(const c of s.chars.slice().sort((a,b)=>S.proj(b.x,-50,b.z||0)[3]-S.proj(a.x,-50,a.z||0)[3]))drawChar(c);
   const lights=[],E2=s.chars.find(c=>c.id==='echo');
-  if(s.ripple!=null&&E2){const c=S.proj(E2.x,-60,E2.z),k=S.cam3.K*c[2];for(let i=0;i<3;i++){const r=((s.ripple*60+i*12)%36);ring(c[0],c[1],r*k,r*1.5*k,'#e8e0ff')}}
+  if(s.ripple!=null&&E2){const c=S.proj(E2.x,-55,E2.z),k=S.cam3.K*c[2];for(let i=0;i<4;i++){const r=((s.ripple*70+i*10)%40)+4;ring(c[0],c[1],r*.7*k,r*1.4*k,i%2?'#e8e0ff':'#ffffff');ring(c[0],c[1],r*.7*k+1,r*1.4*k+1,'#8a80b0')}}
   if(s.beam){const A=s.chars.find(c=>c.id==='blue'),o=S.w3(A,S.pose3(A).rH),end=s.beam.clash!=null?[s.beam.clash,o[1],o[2]]:[lerp(o[0],E2.x,s.beam.k),o[1],lerp(o[2],E2.z,s.beam.k)];
-    S.beam3(o,end,7,'#4fb4ff','#c8ecff');lights.push({x:o[0],y:o[1],z:o[2],c:[90,190,255],r:40,i:.7});
-    if(s.beam.clash!=null){const eo=S.w3(E2,S.pose3(E2).rH);S.beam3(eo,end,7,'#cfc8e8','#ffffff');const p=S.proj(...end),k=S.cam3.K*p[2];disc(p[0],p[1],(8+Math.sin(t*40)*2)*k,'#ffffff');ring(p[0],p[1],16*k,16*k,'#ffffff');lights.push({x:end[0],y:end[1],z:end[2],c:[255,250,240],r:60,i:.9})}}
-  if(s.spark){const p=S.proj(...s.spark),k=S.cam3.K*p[2];disc(p[0],p[1],7*k,'#ffffff');ring(p[0],p[1],14*k,14*k,'#ffffff');lights.push({x:s.spark[0],y:s.spark[1],z:s.spark[2],c:[255,250,240],r:60,i:.8})}
+    S.beam3(o,end,7,'#4fb4ff','#c8ecff');lights.push({x:o[0],y:o[1],z:o[2],c:[90,190,255],r:70,i:.95},{x:(o[0]+end[0])/2,y:o[1],z:o[2],c:[90,190,255],r:45,i:.6});
+    if(s.beam.clash!=null){const eo=S.w3(E2,S.pose3(E2).rH);S.beam3(eo,end,7,'#cfc8e8','#ffffff');const p=S.proj(...end),k=S.cam3.K*p[2],f=Math.floor(t*24),r=(7+Math.sin(t*40)*1.5)*k;
+      disc(p[0],p[1],r+3,'#4fb4ff');S.ctx().save();S.ctx().beginPath();S.ctx().rect(p[0],0,S.PW,S.PH);S.ctx().clip();disc(p[0],p[1],r+3,'#cfc8e8');S.ctx().restore();disc(p[0],p[1],r*.6,'#ffffff');
+      for(let i=0;i<8;i++){const a=-Math.PI/2+(S.hash(f*5+i)-.5)*1.6+(i%2?Math.PI:0),l=(10+S.hash(f+i)*22)*k;S.line(p[0],p[1],p[0]+Math.cos(a)*l,p[1]+Math.sin(a)*l,1,i%3?'#ffffff':'#4fb4ff')}lights.push({x:end[0],y:end[1],z:end[2],c:[255,250,240],r:60,i:.9})}}
+  if(s.spark){const p=S.proj(...s.spark),k=S.cam3.K*p[2];disc(p[0],p[1],4*k,'#ffffff');ring(p[0],p[1],9*k,9*k,'#ffffff');lights.push({x:s.spark[0],y:s.spark[1],z:s.spark[2],c:[255,250,240],r:60,i:.8})}
   S.lightPass(lights);
-  if(s.crack&&E2){const c=S.proj(E2.x,-60,E2.z);S.glassCrack(c[0],c[1],s.crack*.5,7)}
+  if(s.crack&&E2){const c=S.proj(E2.x,-60,E2.z),mask=S.withLayer(()=>S.figure3(E2,'plain')).getImageData(0,0,S.PW,S.PH).data,cr=S.withLayer(()=>S.glassCrack(c[0],c[1],s.crack*.35,7)).getImageData(0,0,S.PW,S.PH).data,b=S.ctx(),M=b.getImageData(0,0,S.PW,S.PH),m=M.data;
+    for(let i=0;i<m.length;i+=4)if(mask[i+3]&&cr[i+3]){m[i]=cr[i];m[i+1]=cr[i+1];m[i+2]=cr[i+2]}b.putImageData(M,0,0)}
   if(s.flash)S.ditherFill(s.flash,'#ffffff');
+  if(s.lock)['green','echo'].forEach((id,i)=>{const dt=s.lock[i],c=s.chars.find(q=>q.id===id);if(!c||dt<0||dt>.35)return;const p=S.proj(c.x,-50,c.z||0),k=S.cam3.K*p[2],r=(20+dt*120)*k;ring(p[0],p[1],r*.6,r,'#ffffff');ring(p[0],p[1],r*.6+1,r+1,'#8a80b0')});
   S.rain(.3);
-  if(s.cut)S.cutIn({k:s.cut.k,y:.42,h:.2,slope:-.18,look:s.cut.look,name:s.cut.name,sub:s.cut.sub,col:s.cut.col});
-  if(s.cut2!=null){S.cutIn({k:clamp(s.cut2*1.3),y:.3,h:.15,slope:-.16,look:LOOK.red,name:'紅 KURENAI',sub:'¡AHORA!',col:'#ff2e45'});S.cutIn({k:clamp(s.cut2*1.3-.15),y:.62,h:.15,slope:.16,look:LOOK.blue,name:'蒼 AOI',sub:'¡AHORA!',col:'#4fb4ff',dir:-1})}
+  if(s.cut)S.cutIn({k:s.cut.k,y:.42,h:.24,slope:-.18,look:s.cut.look,name:s.cut.name,sub:s.cut.sub,col:s.cut.col});
+  if(s.cut2!=null){S.cutIn({k:clamp(s.cut2*1.3),y:.3,h:.19,slope:-.16,look:LOOK.red,name:'紅 KURENAI',sub:'¡AHORA!',col:'#ff2e45'});S.cutIn({k:clamp(s.cut2*1.3-.15),y:.66,h:.19,slope:.16,look:LOOK.blue,name:'蒼 AOI',sub:'¡AHORA!',col:'#4fb4ff',dir:-1})}
   label(s);
 }
 function label(s){if(!ANIMATIC||S.exporting)return;S.R(0,S.PH-11,S.PW,11,'#000000');S.pixText(s.label||s.shot.id,S.PW/2,S.PH-5.5,8,'#ffd84a')}
@@ -228,6 +236,7 @@ S.start({
   state,wind,render,sfx,drone,ambience,
   onAudio:(prev,cur)=>S.musicTick(prev,cur,SEQ.bpm,section),
   setCam:s=>S.setCam3(s.cam3||{}),simulate:T=>S.simulate3(T),
+  subY:t=>SEQ.state(t).split?.53:.8,
   subs:[[st('miran')+.2,st('sigue'),'—¿Viste eso?','見たか'],[st('devolvio')+.2,st('aoi'),'—¡Me lo devolvió!','返された'],
     [st('entiende')+.2,st('quieto'),'—Es mi reflejo… Si no me muevo…','俺の影だ'],[st('otravez')+1.9,st('otravez')+4.6,'—…Otra vez.','またか']],
   hook:[[0,3.2,'TU REFLEJO PARPADEÓ TARDE','影が遅れた']],hookShadow:'#0f6a3a',hookY:.5,
