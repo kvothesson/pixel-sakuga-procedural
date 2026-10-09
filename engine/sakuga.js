@@ -92,6 +92,9 @@ E.P={
  runA:{hip:[0,-40],chest:[10,-67],head:[16,-81],lE:[-8,-56],lH:[-4,-44],rE:[22,-58],rH:[28,-70],lK:[-8,-20],lF:[-14,0],rK:[12,-20],rF:[16,0]},
  runB:{hip:[0,-40],chest:[10,-67],head:[16,-81],lE:[20,-58],lH:[26,-70],rE:[-6,-56],rH:[-2,-44],lK:[-8,-20],lF:[-14,0],rK:[12,-20],rF:[16,0]},
  sweep:{hip:[0,-18],chest:[-10,-38],head:[-14,-51],lE:[-18,-28],lH:[-26,-14],rE:[-2,-30],rH:[-8,-16],lK:[-12,-8],lF:[-26,0],rK:[18,-10],rF:[42,-3]},
+ charge:{hip:[0,-44],chest:[4,-72],head:[7,-87],lE:[-10,-62],lH:[-18,-52],rE:[18,-70],rH:[34,-72],lK:[-12,-22],lF:[-26,0],rK:[14,-23],rF:[24,0]},
+ fire:{hip:[0,-42],chest:[9,-70],head:[14,-84],lE:[14,-66],lH:[30,-68],rE:[24,-71],rH:[40,-72],lK:[-16,-21],lF:[-30,0],rK:[15,-23],rF:[24,0]},
+ kneel:{hip:[0,-26],chest:[5,-53],head:[9,-67],lE:[2,-42],lH:[10,-30],rE:[12,-40],rH:[18,-28],lK:[14,-14],lF:[18,0],rK:[-10,-4],rF:[-24,0]},
  after:{hip:[0,-27],chest:[9,-51],head:[15,-64],lE:[-4,-42],lH:[-22,-40],rE:[22,-38],rH:[32,-4],lK:[-20,-14],lF:[-34,0],rK:[15,-25],rF:[13,0]}
 };
 // interpolación por ARCOS: cada hueso rota alrededor de su padre (no se acorta ni corta camino en línea recta)
@@ -249,6 +252,37 @@ function ditherEllipse(cx,cy,rx,ry,c,level){cx=Math.round(cx);cy=Math.round(cy);
 function shadow(ch,col='#05030a'){const p=E.plantPose(ch),k=E.cam.k,hgt=Math.max(0,-(ch.y||0));
   const lv=Math.max(0,.85-hgt/160),[sx,sy]=toPx(ch.x,0);ditherEllipse(sx,sy+1,(22-hgt*.05)*k,(4)*k,col,Math.min(1,lv*1.2));
   for(const F of['lF','rF']){const[wx,wy]=E.worldPt(ch,p[F]);if(wy<-6)continue;const[fx,fy]=toPx(wx,0);ditherEllipse(fx,fy+1,7*k,2*k,col,1)}}
+// ---------- luz de la energía: los personajes se dibujan en una capa y cada píxel se tiñe según la distancia a cada fuente ----------
+// lights: [{x,y (mundo), c:[r,g,b], r (unidades), i (0..1)}]. Se aplica con dither Bayer: la luz "salpica" en pixel art.
+E.litCast=function(list,lights){
+  lb.clearRect(0,0,E.PW,E.PH);const keep=b;b=lb;for(const it of list)figure(it.ch,it.mode||'glow',it.ink);b=keep;
+  if(lights&&lights.length){const img=lb.getImageData(0,0,E.PW,E.PH),d=img.data,W=E.PW;
+    const Ls=lights.map(L=>{const[px,py]=toPx(L.x,L.y);return{px,py,r:L.r*E.cam.k,c:L.c,i:L.i}}).filter(L=>L.i>0&&L.r>1);
+    for(let y=0;y<E.PH;y++)for(let x=0;x<W;x++){const o=(y*W+x)*4;if(!d[o+3])continue;let best=0,bc=null;
+      for(const L of Ls){const f=(1-Math.hypot(x-L.px,y-L.py)/L.r)*L.i;if(f>best){best=f;bc=L.c}}
+      if(best>0&&BAYER[y&3][x&3]/16<best){d[o]=d[o]*.4+bc[0]*.6;d[o+1]=d[o+1]*.4+bc[1]*.6;d[o+2]=d[o+2]*.4+bc[2]*.6}}
+    lb.putImageData(img,0,0)}
+  b.drawImage(layer,0,0);
+};
+// ---------- piso mojado: refleja todo lo que está sobre el horizonte, con dither, oscurecido y ondulado ----------
+// extra(): dibuja cosas que existen SOLO en el reflejo (para trucos de historia).
+E.wetFloor=function(gy,{strength=.55,maxD,amp=1,extra,extraLevel=1}={}){
+  gy=Math.round(gy);if(gy<=1||gy>=E.PH-1)return;maxD=maxD||E.PH*.4;
+  const M=b.getImageData(0,0,E.PW,E.PH),m=M.data,src=new Uint8ClampedArray(m),W=E.PW;let X=null;
+  if(extra){lb.clearRect(0,0,E.PW,E.PH);const keep=b;b=lb;extra();b=keep;
+    if(extraLevel<1)for(let y=0;y<E.PH;y++)for(let x=0;x<E.PW;x++)if(BAYER[y&3][x&3]/16>=extraLevel)lb.clearRect(x,y,1,1);
+    X=lb.getImageData(0,0,E.PW,E.PH).data}
+  for(let y=gy+1;y<E.PH;y++){const dd=y-gy,sy=gy-dd;if(sy<0)break;const lv=strength*(1-dd/maxD);if(lv<=0)continue;
+    const xw=Math.round(Math.sin(y*.9+Math.floor(E.t*12)*.8)*amp*Math.min(1,dd/8));
+    for(let x=0;x<W;x++){if(BAYER[y&3][x&3]/16>=lv)continue;const sx=x+xw;if(sx<0||sx>=W)continue;const si=(sy*W+sx)*4,o=(y*W+x)*4;
+      let r=src[si],g=src[si+1],bl=src[si+2];if(X&&X[si+3]){r=X[si];g=X[si+1];bl=X[si+2]}
+      m[o]=r*.55+m[o]*.25;m[o+1]=g*.55+m[o+1]*.25;m[o+2]=bl*.6+m[o+2]*.3}}
+  b.putImageData(M,0,0);
+};
+// rayo de energía: núcleo blanco, capas de color, ondula a 24 fps
+E.beam=function(a,c,w,col,lite){const f=Math.floor(E.t*24),dx=c[0]-a[0],dy=c[1]-a[1],d=Math.hypot(dx,dy)||1,nx=-dy/d,ny=dx/d;
+  for(const[ww,cc]of[[w,col],[w*.6,lite],[w*.25,'#ffffff']]){const n=8;let px=a[0],py=a[1];
+    for(let i=1;i<=n;i++){const q=i/n,j=Math.sin(f*1.7+i*2.1)*w*.18*(i<n?1:0),qx=a[0]+dx*q+nx*j,qy=a[1]+dy*q+ny*j;line(px,py,qx,qy,Math.max(1,ww),cc);px=qx;py=qy}}};
 Object.assign(E,{figure,dissolve,ditherEllipse,shadow});
 
 // ---------- efectos ----------

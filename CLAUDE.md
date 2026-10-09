@@ -27,5 +27,8 @@ Abrirla con Playwright, pausar, llamar `window.__seek(t)` en 6 a 12 momentos cla
 
 ## Próximos pasos
 Cada vuelta de mejora es un episodio nuevo; frenar al final de cada uno para que el usuario lo vea.
-1. Ep. 6: reflejos en la azotea mojada y luz de la energía sobre los cuerpos.
-2. Evaluar dónde está el techo.
+El rig 2D de perfil llegó a su techo (ver guía, sección 13). Los saltos que quedan son de paradigma:
+1. Esqueleto 3D proyectado y pixelado (giros, escorzo, vistas 3/4, cámara que orbita).
+2. Editor visual de poses y timeline.
+3. Retratos de alta resolución para primeros planos de rostro.
+Todo movimiento nuevo pasa antes por `escenas/lab/` (fondo claro, cuadro por cuadro).

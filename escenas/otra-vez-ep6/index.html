@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Otra Vez · Ep. 6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* Layout: short vertical 9:16 centrado, gancho arriba, subtítulos abajo, controles debajo. Look nocturno fijo (single-theme a propósito). */
+:root{
+  --night:#07050d;
+  --ink:#ece8f6;
+  --dim:#8a83a6;
+  --blue:#4fb4ff;
+  --red:#ff2e45;
+  --green:#5bff9e;
+  --f-pixel:"DotGothic16","MS Gothic",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--ink);margin:0}
+body{font-family:var(--f-pixel);padding-inline:16px;padding-block:16px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.stage{position:relative;width:min(100%,calc(82vh * 9 / 16));aspect-ratio:9/16;max-width:100%;overflow:hidden;background:#000;cursor:pointer;border-radius:10px;box-shadow:0 0 0 2px #10261c}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.hook{position:absolute;top:13%;left:0;right:0;text-align:center;pointer-events:none;font-size:clamp(18px,6vw,30px);letter-spacing:.06em;color:#fff;
+  text-shadow:3px 0 #0f6a3a,-3px 0 #000,0 3px #000,0 -3px #000}
+.hook small{display:block;font-size:.5em;color:#ffd84a;letter-spacing:.2em;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000}
+.sub{position:absolute;left:50%;bottom:17%;transform:translateX(-50%);width:92%;text-align:center;pointer-events:none;
+  font-size:clamp(18px,5.5vw,26px);color:#fff;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000,0 -2px #000}
+.sub small{display:block;font-size:.62em;color:#ffd84a;letter-spacing:.1em}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;color:var(--dim);font-size:14px}
+button{font:inherit;color:var(--ink);background:#140d22;border:2px solid #3a2a5c;padding:6px 14px;cursor:pointer;letter-spacing:.06em}
+button:hover{border-color:var(--green);color:#fff}
+button[aria-pressed="true"]{border-color:var(--green);color:#fff}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+</style>
+</head><body>
+<div class="stage" id="stage">
+  <canvas id="c" aria-label="Short vertical en pixel art: tres rayos de energía chocan sobre una azotea mojada; en el reflejo aparece alguien que no está"></canvas>
+  <div class="hook" id="hook"></div>
+  <div class="sub" id="sub"></div>
+</div>
+<div class="controls">
+  <button id="sound" type="button" aria-pressed="false">♪ ACTIVAR SONIDO</button>
+  <button id="toggle" type="button">❚❚ PAUSA</button>
+</div>
+<script src="../../engine/sakuga.js"></script>
+<script>
+(()=>{
+const S=window.Sakuga,{P,lerp,ease,easeIn,easeOut,clamp,segAt,lerpPose,rotPt,worldPt,q8,q12}=S;
+const LOOP=10.0;
+
+// ---------- personajes ----------
+const BLUE={head:'hood',
+  pal:{coat:'#232a5c',coatD:'#161a3c',pants:'#1a1d3a',pantsD:'#13152c',boot:'#0c0d1c',skin:'#f0c4a0',glove:'#d8e8ff',hood:'#1b2350',hair:'#2a3060',tip:'#4fb4ff',aura:'#4fb4ff',dark:'#1f5fa8'},
+  chains:[
+    {key:'coat',anchor:'hip',off:[-5,-5],n:3,len:8,w:[8,11],col:'coatD',grav:1.3,wind:.8},
+    {key:'braid',anchor:'head',off:[-7,-2],n:7,len:6,w:[3,2],col:'hair',tip:'tip',tipFrom:5,grav:1,damp:.9,when:c=>c.hoodDown}
+  ]};
+const RED={head:'hair',
+  pal:{coat:'#4a1222',coatD:'#2c0a14',pants:'#261018',pantsD:'#1c0810',boot:'#120508',skin:'#e0b090',glove:'#e0b090',hair:'#15060c',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
+  chains:[
+    {key:'coat',anchor:'hip',off:[-5,-5],n:3,len:8,w:[8,11],col:'coatD',grav:1.3,wind:.8},
+    {key:'scarf',anchor:'chest',off:[-2,-3],n:7,len:8,w:[4,2],col:'scarf',grav:.9,damp:.88},
+    {key:'pony',anchor:'head',off:[-6,-6],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}
+  ]};
+const GREEN={head:'hood',
+  pal:{coat:'#14382a',coatD:'#0c2419',pants:'#0e2a1e',pantsD:'#0a1f16',boot:'#06120c',skin:'#0b1712',neck:'#0b1712',glove:'#9affc4',hood:'#14382a',hair:'#14382a',aura:'#5bff9e',dark:'#0f6a3a'},
+  chains:[{key:'cape',anchor:'chest',off:[-3,-2],n:7,len:9,w:[13,7],col:'coatD',grav:1.3,wind:.55,damp:.92}]};
+
+const SHADE={head:'hair',pal:{coat:'#06040a',coatD:'#06040a',pants:'#06040a',pantsD:'#06040a',boot:'#06040a',skin:'#06040a',neck:'#06040a',glove:'#06040a',hair:'#06040a',aura:'#e8e0ff',dark:'#000'},
+  chains:[{key:'coat',anchor:'hip',off:[-5,-5],n:3,len:8,w:[8,11],col:'coatD',grav:1.3,wind:.8}]};
+
+// ---------- coreografía ----------
+// O charco vacío · W se enfrentan · C cargan energía (la luz los tiñe) · F disparan · H hit-stop · I impact · X blanco
+// A quedan de rodillas; en el reflejo hay alguien que arriba no está · Z la cámara baja al charco · E charco vacío (= cuadro 0)
+const T={wide:1.0,ghost1:1.55,ghost2:1.75,charge:2.2,fire:3.6,hit:4.6,imp:4.68,white:5.1,after:5.5,ghost3:6.7,ask:7.0,down:8.0,close:8.8};
+const RX=-58,BX=-88,GX=62,CENTER=[-8,-70];
+const PUDDLE={zoom:2.4,camX:150,camY:24};
+function state(t){
+  const t12=q12(t),sg=(a,c)=>segAt(t,a,c),sg12=(a,c)=>segAt(t12,a,c);
+  const breath=o=>Math.floor(q8(t)*2.67+o)%2?P.stance2:P.stance;
+  const s={phase:'O',cam:{...PUDDLE},chars:[]};
+  if(t<T.wide)return s;
+  if(t>=T.close){s.phase='E';return s}
+  const red={id:'red',pose:breath(1),dir:1,x:RX},blue={id:'blue',pose:breath(0),dir:1,x:BX,hoodDown:true},green={id:'green',pose:breath(.5),dir:-1,x:GX};
+  s.chars=[blue,red,green];
+  if(t<T.charge){s.phase='W';s.cam={zoom:1.0,camX:-10,camY:lerp(-40,-62,ease(sg(T.wide,T.charge)))}}
+  else if(t<T.fire){s.phase='C';const k=ease(sg12(T.charge,T.charge+.35));for(const c of s.chars)c.pose=lerpPose(P.stance,P.charge,k);
+    s.cam={zoom:lerp(1.0,1.18,ease(sg(T.charge,T.fire))),camX:-10,camY:-66,shake:sg(T.charge,T.fire)*2}}
+  else if(t<T.white){for(const c of s.chars)c.pose=P.fire;
+    if(t<T.hit){s.phase='F';s.cam={zoom:1.2,camX:-10,camY:-66,shake:4,rot:Math.sin(t12*6)*.05}}
+    else if(t<T.imp){s.phase='H';s.freeze=T.hit-.01;s.cam={zoom:1.25,camX:-10,camY:-66}}
+    else{s.phase='I';s.cam={zoom:1.25,camX:-10,camY:-66,shake:6}}}
+  else if(t<T.down){s.phase=t<T.after?'X':'A';const bob=Math.floor(q8(t)*2.67)%2?-1:0;
+    for(const c of s.chars){c.pose=t<T.after?P.fire:P.kneel;c.y=t<T.after?0:bob}
+    s.cam={zoom:1.0,camX:-10,camY:-62}}
+  else{s.phase='Z';for(const c of s.chars)c.pose=P.kneel;const k=ease(sg(T.down,T.close));
+    s.cam={zoom:lerp(1,PUDDLE.zoom,k),camX:lerp(-10,PUDDLE.camX,k),camY:lerp(-62,PUDDLE.camY,k)}}
+  return s;
+}
+const wind=t=>[-(200+120*Math.sin(t*1.3)),-50];
+
+// ---------- dibujo ----------
+function roof(s){
+  const{toPx,wrect,R,hash}=S;
+  for(let i=-16;i<17;i++){const w=30+hash(i)*40,h=20+hash(i+50)*60,x=i*50-s.cam.camX*.4;wrect(x,-h+30,w,h+400,'#0d0817');
+    for(let j=0;j<5;j++)if(hash(i*13+j)>.4){const wx=x+4+hash(i*7+j)*(w-8),wy=-h+36+hash(i*3+j)*60;wrect(wx,wy,2.5,2.5,hash(i+j)>.6?'#ffb070':'#7080ff')}}
+  const[x0,gy]=toPx(-300,0),[x1]=toPx(300,0);
+  R(x0,gy,x1-x0,S.PH,'#150e1e');R(x0,gy,x1-x0,1,'#7a1830');
+  const f=Math.floor(S.t*12),k=S.cam.k,[mx,my]=toPx(175,26);
+  for(let dy=-8;dy<=8;dy++){const w=Math.sqrt(Math.max(0,64-dy*dy))*k*1.6,wob=Math.round(Math.sin(dy*.9+f*.7)*1.5*k);
+    S.R(mx-w+wob,my+dy*k*.45,2*w,Math.max(1,k*.45),dy<-3?'#a81830':'#d8243a')}
+  S.ditherEllipse(mx,my,14*k*1.6,4*k,'#5a1028',.5);
+  const per=LOOP/12;for(let i=0;i<10;i++){const[px,py]=toPx(110+S.hash(i)*90,8+S.hash(i+3)*26),r=((S.t+S.hash(i+9)*per)%per)/per;
+    S.ring(px,py,r*10*k,r*2.6*k,r<.5?'#8a80a8':'#3a3458')}
+}
+const RGB={red:[255,60,80],blue:[90,190,255],green:[100,255,170],white:[255,250,240]};
+function orbAt(c){return worldPt(c,c.pose.rH)}
+// la figura que solo existe en el reflejo
+function shade(){const ch={id:'shade',pose:P.stance,dir:-1,x:CENTER[0]+4};
+  S.figure(ch,'glow');const k=S.cam.k,[ex,ey]=S.toPx(...worldPt(ch,[P.stance.head[0]+4,P.stance.head[1]-1]));S.R(ex-2*k,ey,2*k,Math.max(1,k),'#ffffff');S.R(ex+1*k,ey,2*k,Math.max(1,k),'#ffffff')}
+
+function render(s){
+  const{toPx,ditherFill,ditherDisc,disc,ring,seg}=S,t=S.t;
+  const by=Object.fromEntries(s.chars.map(c=>[c.id,c]));
+  if(s.phase==='I'){S.impact(T.imp,...CENTER,s.chars,'光');return}
+  S.sky(['#04030a','#08061a','#0e0a24','#1a0c26','#2a1024'],{x:S.PW*.62-s.cam.camX*.05*S.cam.k,y:S.toPx(0,-330)[1]*.3+S.PH*.06,r:S.PW*.16});
+  roof(s);
+  const lights=[];
+  if(s.chars.length){
+    const red=by.red,blue=by.blue,green=by.green;
+    const pc=s.phase==='C'?ease(seg(T.charge,T.fire)):s.phase==='F'||s.phase==='H'?1:0;
+    for(const c of s.chars)S.shadow(c);
+    if(pc>0)for(const[c,key]of[[red,'red'],[blue,'blue'],[green,'green']]){const[ox,oy]=orbAt(c),pal={red:RED,blue:BLUE,green:GREEN}[key].pal;
+      lights.push({x:ox,y:oy,c:RGB[key],r:22+pc*26,i:.3+pc*.5});S.aura(ox,oy,pal,pc,22)}
+    if(s.phase==='F'||s.phase==='H'){const k=s.phase==='H'?1:ease(seg(T.fire,T.fire+.4));lights.push({x:CENTER[0],y:CENTER[1],c:RGB.white,r:30+k*45,i:.3+k*.45})}
+    if(s.phase==='X')lights.push({x:CENTER[0],y:CENTER[1],c:RGB.white,r:200,i:1-seg(T.white,T.after)});
+    S.litCast(s.chars.map(ch=>({ch,mode:s.phase==='A'||s.phase==='Z'?'plain':'glow'})),lights);
+    if(pc>0)for(const c of s.chars){const[ox,oy]=toPx(...orbAt(c)),r=(2+pc*4+Math.sin(t*30)*.6)*S.cam.k,col=c.id==='red'?'#ff2e45':c.id==='blue'?'#4fb4ff':'#5bff9e';
+      disc(ox,oy,r+2,col);disc(ox,oy,r,'#ffffff')}
+    if(s.phase==='F'||s.phase==='H'){const k=s.phase==='H'?1:ease(seg(T.fire,T.fire+.25)),cc=toPx(...CENTER);
+      for(const[c,col,lite]of[[red,'#ff2e45','#ffb0b8'],[blue,'#4fb4ff','#c8ecff'],[green,'#5bff9e','#d0ffe4']]){const a=toPx(...orbAt(c));S.beam(a,[lerp(a[0],cc[0],k),lerp(a[1],cc[1],k)],7*S.cam.k,col,lite)}
+      const core=(6+seg(T.fire,T.hit)*14+Math.sin(t*40)*2)*S.cam.k;ditherDisc(cc[0],cc[1],core*3,'#ffffff',.5);disc(cc[0],cc[1],core,'#ffffff');
+      for(let i=0;i<3;i++){const r=((t-T.fire)*140+i*50)%160;ring(cc[0],cc[1],r*S.cam.k,r*S.cam.k*.6,'#ffffff')}}
+    if(s.phase==='C')S.focusLines('#e8e0ff',Math.round(30*seg(T.charge+.6,T.fire)),1,12,...toPx(...CENTER));
+    if(s.phase==='F')S.focusLines('#ffffff',36,2,24,...toPx(...CENTER));
+    if(s.phase==='A'){for(let i=0;i<14;i++){const ph=(t-T.after)*.35+S.hash(i)*.4,lv=.45-ph*.4;if(lv<=0)continue;const[px,py]=toPx(CENTER[0]+(S.hash(i+3)-.5)*120,-ph*40-S.hash(i+7)*30);ditherDisc(px,py,(10+ph*25)*S.cam.k,'#5a5070',lv)}}
+  }
+  // el reflejo: muestra todo lo de arriba... y a alguien más
+  const ghostA=(t>=T.ghost1&&t<T.ghost2)?.35:(t>=T.ghost3&&t<T.down+.5)?Math.min(1,seg(T.ghost3,T.ghost3+.6))*(1-seg(T.down+.1,T.down+.5)):0;
+  S.wetFloor(toPx(0,0)[1],{strength:.6,amp:1,extra:ghostA>0?shade:null,extraLevel:ghostA});
+  if(s.phase==='X')ditherFill(1-seg(T.white,T.after),'#ffffff');
+  if(s.phase==='H'){const cc=toPx(...CENTER);disc(cc[0],cc[1],10*S.cam.k,'#ffffff')}
+}
+function post(s){if(s.phase!=='I')S.rain(.3)}
+
+// ---------- sonido ----------
+const X=S.sfx;
+const sfx=[
+  [.15,()=>S.noise(.6,'highpass',2500,6000,.1,1,true)],
+  [T.ghost1,()=>S.tone(.6,'sine',1760,1710,.06)],
+  [T.charge,()=>{S.tone(1.4,'sawtooth',110,220,.12);S.tone(1.4,'sawtooth',147,294,.1);S.tone(1.4,'sawtooth',165,330,.08)}],
+  [T.fire,()=>{X.whoosh(.4);S.noise(1,'bandpass',600,2400,.5,1.2)}],
+  [T.imp,X.boom],
+  [T.white,()=>{X.bigBoom();S.tone(1.6,'sine',880,870,.12)}],
+  [T.ghost3,()=>{S.tone(2,'sine',1760,1700,.08);S.tone(2,'sine',1767,1707,.06)}],
+  [T.ask,X.heartbeat],
+  [T.down,()=>S.noise(.7,'lowpass',200,1200,.18,1,true)]
+];
+const drone=s=>({O:.02,W:.08,C:.3,F:.35,H:0,I:0,X:.1,A:.04,Z:.04,E:.02}[s.phase]??0);
+const ambience=s=>{const hush=s.freeze!=null||s.phase==='I';return{rain:hush?0:.07,wind:hush?0:.03,windFreq:320}};
+
+S.start({
+  loop:LOOP,vertical:true,camCy:.5,reducedT:4.2,
+  chars:{blue:BLUE,red:RED,green:GREEN,shade:SHADE},
+  light:{x:200,rim:'#ff5a6a'},
+  state,wind,render,post,sfx,drone,ambience,
+  subs:[[T.ask,T.down,'—…¿Qué es eso?','あれは何だ']],
+  hook:[[0,1.0,'MIRÁ EL CHARCO','水たまりを見ろ']],
+  el:{stage:document.getElementById('stage'),canvas:document.getElementById('c'),toggle:document.getElementById('toggle'),
+      sound:document.getElementById('sound'),sub:document.getElementById('sub'),hook:document.getElementById('hook')}
+});
+})();
+</script>
+</body></html>

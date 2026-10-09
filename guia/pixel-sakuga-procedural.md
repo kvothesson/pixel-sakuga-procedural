@@ -229,3 +229,32 @@ Sakuga.start({
 - La canilla no puede terminar en punta en el piso con un "tubo" de pie pegado: la forma se lee mal. Ahora la canilla termina ancha (7,5) en el tobillo, entra en una **bota poligonal** (talón, suela plana, punta redondeada, empeine) y un **ruedo** del pantalón tapa la unión.
 - Las manos eran discos grandes (radio 5) que en reposo quedaban a la altura de la entrepierna. Ahora son **puños chicos y alargados** en la dirección del antebrazo (radio ~3,3).
 - Para juzgar siluetas, el laboratorio usa un **fondo claro**: sobre el fondo oscuro de la escena, los errores de forma se esconden.
+
+---
+
+## 12. Ep. 6 — piso mojado y luz de la energía
+
+- **`wetFloor(gy, {strength, amp, extra, extraLevel})`:** copia todo lo que está sobre el horizonte, lo espeja hacia abajo con dither Bayer, lo oscurece y lo ondula a 12 fps. Refleja figuras, rayos, ciudad y lluvia con una sola llamada al final del render.
+- **Truco de historia, `extra`:** dibuja algo que existe *solo* en el reflejo. Tiene que tener un borde claro: una silueta negra sobre un piso oscuro, y encima reflejada, desaparece.
+- **`litCast(lista, luces)`:** dibuja los personajes en una capa y tiñe cada píxel según la luz más cercana, con dither. Las luces tienen que ser chicas (radio de 20 a 50): con radios grandes tiñen todo de un color y se pierde la lectura de quién está iluminado.
+- **`beam(a, b, w, color, claro)`:** tres capas (color, claro y núcleo blanco) que ondulan a 24 fps.
+- **Gancho de re-visualización:** "MIRÁ EL CHARCO" más una figura que aparece medio segundo en el reflejo al principio y que se ve clara al final. Invita a mirar el loop otra vez.
+- **El plano del charco necesita contenido propio:** una luna roja reflejada que ondula y ondas de lluvia con período LOOP/12. Si no, el cuadro del inicio y del final queda negro.
+
+---
+
+## 13. Dónde está el techo (evaluación después del Ep. 6)
+
+| Aspecto | Antes (Kessen) | Ahora (Ep. 6) | Techo de este enfoque |
+|---|---|---|---|
+| Ritmo y dirección (timing, hit-stop, impact frames, cortes) | alto | alto | **ya está cerca del techo** |
+| Efectos (energía, chispas, lluvia, reflejos, luz) | medio | alto | cerca del techo |
+| Movimiento del cuerpo (arcos, smears, IK, marcha, física de tela) | bajo | medio-alto | rindiendo cada vez menos |
+| Anatomía y silueta | bajo | medio | limitado por la resolución |
+| Caras y expresión | nulo | nulo (capuchas, ojos en primer plano) | **techo duro** a ~150 px de ancho |
+| Perspectiva y volumen | nulo | nulo: **todo es de perfil** | **techo duro del rig 2D** |
+
+**Conclusión:** las mejoras incrementales sobre el rig 2D de perfil ya rinden poco. Cada vuelta suma menos que la anterior y los errores (rodillas, pies, manos) aparecen al acercarse a la "anatomía real". Para romper el techo hay que **cambiar de paradigma**, no seguir puliendo:
+1. **Esqueleto 3D proyectado y pixelado:** el mismo rig con profundidad, rotación y cámara que orbita. Habilita giros reales, escorzo (un puño hacia la cámara), vistas 3/4 y planos con perspectiva. Es el salto más grande disponible.
+2. **Herramienta de coreografía:** un editor visual de poses y timeline. Hoy cada pose es un número escrito a mano, y ese es el cuello de botella creativo.
+3. **Rostros en primeros planos:** retratos pixelados a más resolución para los cortes de cara, sin tocar el plano general.
