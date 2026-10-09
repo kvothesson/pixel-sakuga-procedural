@@ -24,6 +24,7 @@ Escenas de acción con dirección de anime (sakuga) en pixel art generado por c�
 - `escenas/otra-vez/` y `escenas/kessen-16bit/` son anteriores al motor y siguen siendo autocontenidas. No migrarlas salvo que se pida.
 
 ## Cómo verificar una escena
+Antes de publicar: `python3 tools/check.py` (abre todas las escenas, las recorre y falla si hay errores de JavaScript; un error en el motor congela la escena en el título).
 Abrirla con Playwright, pausar, llamar `window.__seek(t)` en 6 a 12 momentos clave, sacar capturas y armar una grilla para revisarla de un vistazo. Una sola pasada de correcciones por revisión.
 
 ## Próximos pasos

@@ -315,3 +315,7 @@ El salto de paradigma recomendado en la sección 13. El mismo pixel art, pero ah
 - **Reflejos antes que los personajes:** si se dibujan después, el reflejo de uno más lejano tapa los pies de uno más cercano.
 - **Composición con muchos personajes:** con la cámara a la altura de los ojos, un anillo de 9 figuras se amontona en una franja. Con un **plano casi cenital** (`pitch` ≈ 0,9) el anillo se lee como anillo, y para el remate se baja la cámara (`pitch` 0,25) y se acerca.
 - **Loop con cámara orbitando:** si la cámara da exactamente una vuelta por loop (`yaw = yaw0 + 2π·t/LOOP`) y el primer y el último segmento tienen el mismo contenido, la órbita también cierra.
+
+### Corrección: el Ep. 7 no pasaba del título
+- Al sacar los faldones con reemplazos de texto quedó un hueco en una lista de cadenas (`chains:[ , {…}]`). El motor leía `undefined.off`, tiraba error en cada cuadro y la escena se quedaba congelada en el primero.
+- Ahora el motor ignora huecos en las listas, y `tools/check.py` recorre todas las escenas buscando errores de JavaScript. **Correrlo siempre antes de publicar:** cambiar el motor puede romper episodios viejos que no se volvieron a mirar.

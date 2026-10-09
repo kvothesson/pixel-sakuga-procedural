@@ -154,7 +154,7 @@ function simulate(T){
     for(const ch of st.chars||[]){
       const def=scene.chars[ch.id];if(!def||!def.chains)continue;
       const r=res[ch.id]||(res[ch.id]={chains:{},x:ch.x,y:ch.y||0});r.x=ch.x;r.y=ch.y||0;
-      for(const spec of def.chains){
+      for(const spec of def.chains.filter(Boolean)){
         const a=chainAnchor(ch,spec),key=ch.id+spec.key,pa=prevA[key];let nodes=r.chains[spec.key];
         if(!nodes||!pa||Math.hypot(a[0]-pa[0],a[1]-pa[1])>70){
           nodes=[];for(let j=0;j<=spec.n;j++){const p=[a[0]-(ch.dir||1)*j*spec.len*.35,a[1]+j*spec.len*.92];nodes.push({p,o:[p[0],p[1]]})} // arranca colgando
@@ -182,7 +182,7 @@ function figure(ch,mode='glow',inkCol){
   const pt=q=>{const[wx,wy]=E.worldPt(ch,q),[a,c]=toPx(wx,wy);return[a+E.SHX,c]};
   const J={};for(const j in p)J[j]=pt(p[j]);
   const cache=E.chainCache[ch.id],sdx=cache?ch.x-cache.x:0,sdy=cache?(ch.y||0)-cache.y:0;
-  const chains=(def.chains||[]).filter(sp=>!sp.when||sp.when(ch)).map(sp=>({sp,pts:cache&&cache.chains[sp.key]?cache.chains[sp.key].map(n=>{const[a,c]=toPx(n.p[0]+sdx,n.p[1]+sdy);return[a+E.SHX,c]}):null})).filter(c=>c.pts);
+  const chains=(def.chains||[]).filter(sp=>sp&&(!sp.when||sp.when(ch))).map(sp=>({sp,pts:cache&&cache.chains[sp.key]?cache.chains[sp.key].map(n=>{const[a,c]=toPx(n.p[0]+sdx,n.p[1]+sdy);return[a+E.SHX,c]}):null})).filter(c=>c.pts);
   const L=(a,c,w,col)=>line(a[0],a[1],c[0],c[1],w,col);
   const [hx,hy]=p.head;
   // SMEARS: si una mano o un pie se movió mucho desde el cuadro anterior (a 12 fps), se estira por el arco recorrido

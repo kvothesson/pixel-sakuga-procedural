@@ -81,7 +81,7 @@ E.figure3=function(ch,mode='glow',inkCol,{mirror=false}={}){
     groups.push({d:tp.reduce((s,q)=>s+q[3],0)/tp.length,parts,eyes});}
   // cadenas físicas (faldón, capa, pelo, bufanda)
   const cache=E.chainCache&&E.chainCache[ch.id];
-  if(cache&&!mirror)for(const sp of def.chains||[]){if(sp.when&&!sp.when(ch))continue;const nodes=cache.chains[sp.key];if(!nodes)continue;
+  if(cache&&!mirror)for(const sp of(def.chains||[]).filter(Boolean)){if(sp.when&&!sp.when(ch))continue;const nodes=cache.chains[sp.key];if(!nodes)continue;
     const dx=ch.x-cache.x,dy=(ch.y||0)-cache.y,dz=(ch.z||0)-cache.z,pr=nodes.map(n=>E.proj(n.p[0]+dx,n.p[1]+dy,n.p[2]+dz)),n=pr.length-1;
     groups.push({d:pr.reduce((s,q)=>s+q[3],0)/pr.length+(sp.key.startsWith('coat')||sp.key==='cape'?6:0),parts:pr.slice(0,-1).map((a,i)=>({t:'limb',a,b:pr[i+1],
       wa:lerp(sp.w[0],sp.w[1],i/n)*a[2]*K,wb:lerp(sp.w[0],sp.w[1],(i+1)/n)*pr[i+1][2]*K,col:sp.tipFrom!=null&&i>=sp.tipFrom?pal[sp.tip]:pal[sp.col]}))})}
@@ -137,7 +137,7 @@ E.simulate3=function(T){
     for(const ch of st.chars||[]){const def=sc.chars[ch.id];if(!def||!def.chains)continue;
       const r=res[ch.id]||(res[ch.id]={chains:{}});r.x=ch.x;r.y=ch.y||0;r.z=ch.z||0;
       const p=E.pose3(ch);
-      for(const sp of def.chains){const off=sp.off.length===3?sp.off:[sp.off[0],sp.off[1],0],q=p[sp.anchor],a=E.w3(ch,[q[0]+off[0],q[1]+off[1],q[2]+off[2]]);
+      for(const sp of def.chains.filter(Boolean)){const off=sp.off.length===3?sp.off:[sp.off[0],sp.off[1],0],q=p[sp.anchor],a=E.w3(ch,[q[0]+off[0],q[1]+off[1],q[2]+off[2]]);
         const key=ch.id+sp.key,pa=prevA[key];let nodes=r.chains[sp.key];
         if(!nodes||!pa||Math.hypot(a[0]-pa[0],a[1]-pa[1],a[2]-pa[2])>70){nodes=[];const bx=-Math.cos(ch.yaw||0),bz=-Math.sin(ch.yaw||0);
           for(let j=0;j<=sp.n;j++){const pp=[a[0]+bx*j*sp.len*.35,a[1]+j*sp.len*.92,a[2]+bz*j*sp.len*.35];nodes.push({p:pp,o:pp.slice()})}r.chains[sp.key]=nodes}
