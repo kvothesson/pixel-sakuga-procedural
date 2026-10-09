@@ -224,3 +224,8 @@ Sakuga.start({
 - **Vuelo del pie:** despega por detrás y sube rápido, con el pico en el primer tercio del vuelo (`sin(π·q^0,7)`).
 - **Faldones y capas:** se dibujan con el trazo afinado de los miembros (`limb`), no con pincel cuadrado. Tienen que abrirse hacia abajo (`w:[9,14]`) y usar el color de sombra, si no se leen como una tercera pierna o una caja.
 - **Laboratorio:** `escenas/lab/` muestra un personaje solo y grande caminando, corriendo y parado. Se revisa cuadro por cuadro con `tools/grid.py` antes de usar un movimiento en un episodio.
+
+### Corrección: pies y manos (feedback: "la junta de los pies se ve mal")
+- La canilla no puede terminar en punta en el piso con un "tubo" de pie pegado: la forma se lee mal. Ahora la canilla termina ancha (7,5) en el tobillo, entra en una **bota poligonal** (talón, suela plana, punta redondeada, empeine) y un **ruedo** del pantalón tapa la unión.
+- Las manos eran discos grandes (radio 5) que en reposo quedaban a la altura de la entrepierna. Ahora son **puños chicos y alargados** en la dirección del antebrazo (radio ~3,3).
+- Para juzgar siluetas, el laboratorio usa un **fondo claro**: sobre el fondo oscuro de la escena, los errores de forma se esconden.

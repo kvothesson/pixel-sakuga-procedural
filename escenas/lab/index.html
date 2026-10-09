@@ -11,13 +11,13 @@
 <script>
 const S=window.Sakuga,{P,lerpPose,gait}=S;
 const RED={head:'hair',pal:{coat:'#4a1222',coatD:'#2c0a14',pants:'#261018',pantsD:'#1c0810',boot:'#120508',skin:'#e0b090',glove:'#e0b090',hair:'#15060c',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
-  chains:[{key:'coat',anchor:'hip',off:[-6,-2],n:3,len:7.5,w:[9,14],col:'coatD',grav:1.3},{key:'pony',anchor:'head',off:[-6,-6],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}]};
+  chains:[{key:'coat',anchor:'hip',off:[-5,-5],n:3,len:8,w:[8,11],col:'coatD',grav:1.3},{key:'pony',anchor:'head',off:[-6,-6],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}]};
 function state(t){const t12=S.q12(t),c={id:'red',dir:1};
   if(t<4){const g=gait(t12*70,{x0:0,stride:64,lift:9,bob:1.6});Object.assign(c,{x:g.x,y:g.y,plant:{lF:g.l,rF:g.r},pose:lerpPose(P.walkA,P.walkB,g.swing)})}
   else if(t<6){const g=gait(280+(t12-4)*150,{x0:0,stride:92,lift:16,lead:.33,bob:3});Object.assign(c,{x:g.x,y:g.y,plant:{lF:g.l,rF:g.r},pose:lerpPose(P.runA,P.runB,g.swing)})}
   else Object.assign(c,{x:460,pose:P.stance});
-  return{phase:'lab',cam:{zoom:2.6,camX:c.x,camY:-48},chars:[c]}}
-function render(s){const{R,toPx}=S;R(0,0,S.PW,S.PH,'#120c1c');const[,gy]=toPx(0,0);R(0,gy,S.PW,S.PH,'#1e1530');
+  const close=t>=6&&t<7;return{phase:'lab',cam:{zoom:close?5.5:2.6,camX:close?c.x+2:c.x,camY:close?-16:-48},chars:[c]}}
+function render(s){const{R,toPx}=S;R(0,0,S.PW,S.PH,'#d8d2e6');const[,gy]=toPx(0,0);R(0,gy,S.PW,S.PH,'#a89cc0');
   for(let i=-40;i<60;i++){const[x]=toPx(i*12,0);R(x,gy,1,4,'#3a2c58')}S.shadow(s.chars[0]);S.figure(s.chars[0],'plain')}
 S.start({loop:8,vertical:true,state,render,chars:{red:RED},light:{x:9999,rim:'#ff5a6a'},el:{stage:stage,canvas:c,toggle:toggle,sub:document.getElementById('sub')}});
 </script></body></html>

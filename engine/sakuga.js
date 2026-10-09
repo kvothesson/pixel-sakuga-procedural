@@ -195,8 +195,14 @@ function figure(ch,mode='glow',inkCol){
     for(const{sp,pts}of chains)if(!sp.front)chainDraw(sp,pts);
     // ANATOMÍA: muslos y brazos que se afinan, pies con punta, torso con hombros y cintura, cuello
     const W=(u)=>u*k+o;
-    const leg=(K,F,c)=>{limb(J.hip,J[K],W(12),W(9),c);limb(J[K],J[F],W(9),W(5.5),c);
-      const heel=pt([p[F][0]-2.5,p[F][1]-1.5]),toe=pt([p[F][0]+8,p[F][1]-1]);limb(heel,toe,W(4.5),W(3),col(pal.boot||pal.pants))};
+    // BOTA: la canilla termina ancha (no en punta) y entra en una bota con talón, suela plana y punta;
+    // el ruedo del pantalón tapa la unión. Nunca un tubo redondeado pegado al tobillo.
+    const BOOT=[[-4.5,-10],[-5.5,-3],[-5,0],[8.5,0],[10.5,-1.5],[10,-3.5],[5,-6],[3.5,-10]];
+    const shape=(F,pts,ox=0)=>pts.map(([x,y])=>pt([p[F][0]+x+ox,p[F][1]+y]));
+    const outlinePoly=(pts,c)=>{poly(pts,c);if(o>0)for(let i=0;i<pts.length;i++){const a=pts[i],b2=pts[(i+1)%pts.length];line(a[0],a[1],b2[0],b2[1],o,c)}};
+    const leg=(K,F,c)=>{limb(J.hip,J[K],W(12),W(9.5),c);const ank=pt([p[F][0],p[F][1]-8]);limb(J[K],ank,W(9.5),W(7.5),c);
+      outlinePoly(shape(F,BOOT),col(pal.boot||pal.pants));
+      outlinePoly(shape(F,[[-5.5,-12.5],[-5.5,-9],[5,-9],[5,-12.5]]),c)}; // ruedo
     leg('lK','lF',col(pal.pantsD||pal.pants));
     limb(J.chest,J.lE,W(8),W(6.5),col(pal.coatD));limb(J.lE,J.lH,W(6.5),W(5),col(pal.coatD));
     leg('rK','rF',col(pal.pants));
@@ -207,7 +213,10 @@ function figure(ch,mode='glow',inkCol){
       disc(top[0]+nx*wv(7),top[1]+ny*wv(7),wv(4),col(pal.coat));disc(top[0]-nx*wv(7),top[1]-ny*wv(7),wv(4),col(pal.coat));}
     limb(J.chest,J.head,W(5.5),W(5),col(pal.neck||pal.skin));
     limb(J.chest,J.rE,W(8),W(6.5),col(pal.coat));limb(J.rE,J.rH,W(6.5),W(5),col(pal.coat));
-    disc(J.lH[0],J.lH[1],4.5*k+o/2,col(pal.glove));disc(J.rH[0],J.rH[1],5*k+o/2,col(pal.glove));
+    // puños: chicos y alargados en la dirección del antebrazo (una bola grande se lee mal)
+    const fist=(E2,H2,r)=>{const dx=J[H2][0]-J[E2][0],dy=J[H2][1]-J[E2][1],d=Math.hypot(dx,dy)||1;
+      limb([J[H2][0]-dx/d*r*.6,J[H2][1]-dy/d*r*.6],[J[H2][0]+dx/d*r*.7,J[H2][1]+dy/d*r*.7],r*1.7*k+o,r*1.5*k+o,col(pal.glove))};
+    fist('lE','lH',3.2);fist('rE','rH',3.4);
     if(def.head==='hood'&&!ch.hoodDown){
       const back=pt([hx-15,hy-4]);L(J.head,back,7*k+o,col(pal.hood));
       disc(J.head[0],J.head[1],10.5*k+o/2,col(pal.hood));
