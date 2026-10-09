@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Otra Vez · Ep. 7</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* Layout: short vertical 9:16 centrado, gancho arriba, subtítulos abajo, controles debajo. Look nocturno fijo (single-theme a propósito). */
+:root{
+  --night:#07050d;
+  --ink:#ece8f6;
+  --dim:#8a83a6;
+  --blue:#4fb4ff;
+  --red:#ff2e45;
+  --green:#5bff9e;
+  --f-pixel:"DotGothic16","MS Gothic",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--ink);margin:0}
+body{font-family:var(--f-pixel);padding-inline:16px;padding-block:16px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.stage{position:relative;width:min(100%,calc(82vh * 9 / 16));aspect-ratio:9/16;max-width:100%;overflow:hidden;background:#000;cursor:pointer;border-radius:10px;box-shadow:0 0 0 2px #10261c}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.hook{position:absolute;top:13%;left:0;right:0;text-align:center;pointer-events:none;font-size:clamp(18px,6vw,30px);letter-spacing:.06em;color:#fff;
+  text-shadow:3px 0 #0f6a3a,-3px 0 #000,0 3px #000,0 -3px #000}
+.hook small{display:block;font-size:.5em;color:#ffd84a;letter-spacing:.2em;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000}
+.sub{position:absolute;left:50%;bottom:17%;transform:translateX(-50%);width:92%;text-align:center;pointer-events:none;
+  font-size:clamp(18px,5.5vw,26px);color:#fff;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000,0 -2px #000}
+.sub small{display:block;font-size:.62em;color:#ffd84a;letter-spacing:.1em}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;color:var(--dim);font-size:14px}
+button{font:inherit;color:var(--ink);background:#140d22;border:2px solid #3a2a5c;padding:6px 14px;cursor:pointer;letter-spacing:.06em}
+button:hover{border-color:var(--green);color:#fff}
+button[aria-pressed="true"]{border-color:var(--green);color:#fff}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+</style>
+</head><body>
+<div class="stage" id="stage">
+  <canvas id="c" aria-label="Short vertical en pixel art 3D: la sombra sale del charco, lanza un puño contra la cámara y el tiempo se congela mientras la cámara gira"></canvas>
+  <div class="hook" id="hook"></div>
+  <div class="sub" id="sub"></div>
+</div>
+<div class="controls">
+  <button id="sound" type="button" aria-pressed="false">♪ ACTIVAR SONIDO</button>
+  <button id="toggle" type="button">❚❚ PAUSA</button>
+</div>
+<script src="../../engine/sakuga.js"></script>
+<script src="../../engine/sakuga3d.js"></script>
+<script>
+(()=>{
+const S=window.Sakuga,{P,lerp,ease,easeIn,easeOut,clamp,segAt,lerpPose,q8,q12,q24}=S;
+const LOOP=9.6;
+
+// ---------- personajes ----------
+const BLUE={head:'hood',
+  pal:{coat:'#232a5c',coatD:'#161a3c',pants:'#1a1d3a',pantsD:'#13152c',boot:'#0c0d1c',skin:'#f0c4a0',glove:'#d8e8ff',hood:'#1b2350',hair:'#2a3060',tip:'#4fb4ff',aura:'#4fb4ff',dark:'#1f5fa8'},
+  chains:[
+    {key:'coat',anchor:'hip',off:[-5,-5],n:3,len:8,w:[8,11],col:'coatD',grav:1.3,wind:.8},
+    {key:'braid',anchor:'head',off:[-7,-2],n:7,len:6,w:[3,2],col:'hair',tip:'tip',tipFrom:5,grav:1,damp:.9,when:c=>c.hoodDown}
+  ]};
+const RED={head:'hair',
+  pal:{coat:'#4a1222',coatD:'#2c0a14',pants:'#261018',pantsD:'#1c0810',boot:'#120508',skin:'#e0b090',glove:'#e0b090',hair:'#15060c',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
+  chains:[
+    {key:'coat',anchor:'hip',off:[-5,-5],n:3,len:8,w:[8,11],col:'coatD',grav:1.3,wind:.8},
+    {key:'scarf',anchor:'chest',off:[-2,-3],n:7,len:8,w:[4,2],col:'scarf',grav:.9,damp:.88},
+    {key:'pony',anchor:'head',off:[-6,-6],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}
+  ]};
+const GREEN={head:'hood',
+  pal:{coat:'#14382a',coatD:'#0c2419',pants:'#0e2a1e',pantsD:'#0a1f16',boot:'#06120c',skin:'#0b1712',neck:'#0b1712',glove:'#9affc4',hood:'#14382a',hair:'#14382a',aura:'#5bff9e',dark:'#0f6a3a'},
+  chains:[{key:'cape',anchor:'chest',off:[-3,-2],n:7,len:9,w:[13,7],col:'coatD',grav:1.3,wind:.55,damp:.92}]};
+
+const SHADE={head:'hair',pal:{coat:'#06040a',coatD:'#030206',pants:'#06040a',pantsD:'#030206',boot:'#020104',skin:'#06040a',neck:'#06040a',glove:'#cfc8e8',hair:'#06040a',aura:'#e8e0ff',dark:'#000'},
+  chains:[{key:'coat',anchor:'hip',off:[-5,-5,0],n:3,len:8,w:[8,11],col:'coatD',grav:1.3}]};
+
+// ---------- coreografía 3D ----------
+// O ojos blancos se abren · R la sombra sube del charco (la cámara orbita) · T todos giran hacia ella · P puño contra la cámara
+// H hit-stop + vidrio roto · C impact · B TIEMPO CONGELADO, la cámara gira alrededor del choque · X se hunde · S "Ya empezó." · Z negro · E ojos se cierran
+const T={wide:1.0,rise:1.3,risen:2.2,turn:2.4,punch:3.0,swing:3.15,hit:3.42,imp:3.55,bullet:3.95,resume:6.0,sink:6.6,talk:6.9,dark:8.0,close:8.6};
+const HERO={red:[-45,25],blue:[-72,-28],green:[58,4]};
+const face=(x,z,tx,tz)=>Math.atan2(tz-z,tx-x);
+const lerpA=(a,b,k)=>{let d=((b-a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;return a+d*k};
+function state(t){
+  const t12=q12(t),sg=(a,c)=>segAt(t,a,c),sg12=(a,c)=>segAt(t12,a,c);
+  const breath=o=>Math.floor(q8(t)*2.67+o)%2?P.stance2:P.stance;
+  const s={phase:'O',cam:{},cam3:{zoom:1,yaw:0},chars:[]};
+  if(t<T.wide)return s;
+  if(t>=T.close){s.phase='E';return s}
+  const red={id:'red',pose:breath(1),x:HERO.red[0],z:HERO.red[1],yaw:0},blue={id:'blue',pose:breath(0),x:HERO.blue[0],z:HERO.blue[1],yaw:-.2,hoodDown:true},
+        green={id:'green',pose:breath(.5),x:HERO.green[0],z:HERO.green[1],yaw:Math.PI},shade={id:'shade',pose:P.stance,x:0,z:0,yaw:Math.PI/2,y:0};
+  s.chars=[red,blue,green,shade];
+  const turnTo=(c,k)=>{c.yaw=lerpA(c.yaw,face(c.x,c.z,0,0),k)};
+  if(t<T.turn){s.phase='R';shade.y=t<T.rise?120:lerp(110,0,easeOut(sg12(T.rise,T.risen)));shade.rising=true;
+    s.cam3={zoom:1.05,yaw:lerp(-.6,-.3,sg(T.wide,T.turn)),ty:-40,D:420,pitch:.24}}
+  else if(t<T.punch){s.phase='T';const k=ease(sg12(T.turn,T.turn+.35));for(const c of[red,blue,green])turnTo(c,k);
+    s.cam3={zoom:1.1,yaw:lerp(-.3,.15,sg(T.turn,T.punch)),ty:-44,D:420,pitch:lerp(.24,.12,sg(T.turn,T.punch))}}
+  else if(t<T.bullet){for(const c of[red,blue,green])turnTo(c,1);
+    // puño contra la cámara: ella mira a cámara y golpea; la cámara está a un brazo de distancia
+    const k=t<T.swing?0:ease(clamp((q24(t)-T.swing)/(T.hit-T.swing)));shade.pose=lerpPose(P.stance,P.strike,k);shade.yaw=Math.PI/2*.86;
+    s.phase=t<T.hit?'P':t<T.imp?'H':'C';if(s.phase==='H')s.freeze=T.hit;
+    s.cam3={zoom:2.2,yaw:.12,ty:-70,tx:0,tz:0,D:118,pitch:-.04,shake:s.phase==='C'?6:0}}
+  else if(t<T.sink){for(const c of[red,blue,green])turnTo(c,1);
+    // el de capa ataja el puño; todo se congela y la cámara da la vuelta
+    shade.pose=P.strike;shade.yaw=0;shade.x=-30;green.x=40;green.z=0;green.yaw=Math.PI;green.pose=P.parry;
+    if(t<T.resume){s.phase='B';s.freeze=T.bullet+.02;const k=sg(T.bullet,T.resume);s.cam3={zoom:1.35,yaw:lerp(.35,.35+Math.PI*1.6,ease(k)),ty:-66,tx:5,D:300,rot:Math.sin(k*Math.PI)*.06}}
+    else{s.phase='X';shade.y=lerp(0,110,easeIn(sg12(T.resume+.1,T.sink)));shade.rising=true;s.cam3={zoom:1.15,yaw:.35+Math.PI*1.6,ty:-60,tx:5,D:340,shake:t<T.resume+.2?6:0}}}
+  else{s.phase=t<T.dark?'S':'Z';red.x=-35;green.x=40;for(const c of[red,blue,green])turnTo(c,1);s.chars=[red,blue,green];
+    const k=sg(T.sink,T.dark);s.cam3={zoom:lerp(1.05,1.2,k),yaw:lerp(-.7,-.5,k),ty:-42,D:400,pitch:.18}}
+  return s;
+}
+const wind=t=>[-(180+120*Math.sin(t*1.3)),-40,30];
+
+// ---------- dibujo ----------
+// solo los ojos en la oscuridad: con open=0 el primer y el último cuadro son idénticos
+function eyesDark(open){const{R,PW,PH}=S,sc=Math.max(1,Math.round(PW/45)),cy=Math.round(PH*.5);R(0,0,PW,PH,'#000000');
+  for(const sx of[-1,1]){const cx=Math.round(PW/2+sx*PW*.14),w=11*sc,h=Math.max(1,Math.round(open*3.5*sc));
+    S.ditherEllipse(cx,cy,w*.9,Math.max(2,h*1.4),'#2a2840',.5*open+.15);R(cx-w/2,cy-Math.floor(h/2),w,h,'#f4f0ff');if(open>.5)R(cx-sx*w/4-sc/2,cy-Math.floor(h/2),sc,h,'#9a96c8')}
+  for(let i=0;i<30;i++)R(S.hash(Math.floor(S.t*12)+i*7)*PW,S.hash(Math.floor(S.t*12)*2+i*3)*PH,1,1,'#16141f')}
+function drawShade(c){
+  if(c.y<=0){S.figure3(c,'glow');return}
+  // sube o baja por el charco: se recorta en la línea del piso
+  const fy=S.proj(c.x,0,c.z)[1],b=S.ctx();b.save();b.beginPath();b.rect(0,0,S.PW,Math.round(fy));b.clip();S.figure3(c,'glow');b.restore();
+  const[px,py,ps]=S.proj(c.x,0,c.z),k=S.cam3.K*ps,f=Math.floor(S.t*12);
+  for(let i=0;i<3;i++){const r=((f/12+i*.17)%.5)/.5;S.ring(px,py,(8+r*30)*k,(2+r*7)*k,r<.5?'#e8e0ff':'#5a5070')}
+}
+function render(s){
+  const{ditherFill,disc,ring,seg}=S,t=S.t;
+  if(s.phase==='O'){eyesDark(ease(seg(.1,.45)));return}
+  if(s.phase==='E'){eyesDark(1-ease(seg(9.0,9.3)));ditherFill(1-seg(T.close,T.close+.2),'#000');return}
+  const by=Object.fromEntries(s.chars.map(c=>[c.id,c]));
+  if(s.phase==='C'){const cp=S.proj(...S.w3(by.shade,S.to3(by.shade.pose).rH));S.impact3(T.imp,cp[0],cp[1],s.chars,'割');S.glassCrack(cp[0],cp[1],1);return}
+  S.sky3(['#04030a','#08061a','#0e0a24','#1a0c26','#2a1024']);
+  S.moon3(-.25,.16,S.PW*.13);S.skyline3();
+  S.floor3('#150e1e','#2a1e3a',360,40);
+  // charco: ondas donde está la sombra
+  {const[px,py,ps]=S.proj(0,0,0),k=S.cam3.K*ps,per=LOOP/12;for(let i=0;i<4;i++){const r=((t+i*per/4)%per)/per;ring(px+(S.hash(i)-.5)*30*k,py+(S.hash(i+3)-.5)*8*k,r*14*k,r*3.5*k,r<.5?'#6a6090':'#2a2440')}}
+  for(const c of s.chars)if(!(c.y>0))S.shadow3(c);
+  const sorted=s.chars.slice().sort((a,b)=>S.proj(b.x,-50,b.z||0)[3]-S.proj(a.x,-50,a.z||0)[3]);
+  for(const c of sorted){if(c.id==='shade')drawShade(c);else{const pal=S.scene.chars[c.id].pal,[ax,ay]=S.proj(c.x,-50,c.z||0);S.ditherDisc(ax,ay,40*S.cam3.K,pal.dark,s.phase==='B'||s.phase==='T'?.6:.3);S.figure3(c,'glow')}}
+  S.reflect3(s.chars.filter(c=>!(c.y>0)),.45);
+  if(s.phase==='B'||s.phase==='H'){const sh=by.shade,fp=S.proj(...S.w3(sh,S.to3(sh.pose).rH)),k=S.cam3.K*fp[2];
+    disc(fp[0],fp[1],6*k,'#ffffff');ring(fp[0],fp[1],12*k,12*k,'#ffffff');
+    for(let i=0;i<8;i++){const a=S.hash(i+3)*Math.PI*2,l=(14+S.hash(i)*20)*k;S.line(fp[0]+Math.cos(a)*7*k,fp[1]+Math.sin(a)*7*k,fp[0]+Math.cos(a)*l,fp[1]+Math.sin(a)*l,1,i%2?'#e8e0ff':'#5bff9e')}}
+  if(s.phase==='H'){const sh=by.shade,fp=S.proj(...S.w3(sh,S.to3(sh.pose).rH));S.glassCrack(fp[0],fp[1],seg(T.hit,T.imp))}
+  if(s.phase==='P'&&t>T.swing)S.focusLines('#e8e0ff',40,2,24,...S.proj(...S.w3(by.shade,S.to3(by.shade.pose).rH)).slice(0,2));
+  if(s.phase==='T')S.speedLines(0,10,'#4a4470');
+  if(s.phase==='X'){const[px,py,ps]=S.proj(0,-60,0);ring(px,py,seg(T.resume,T.resume+.5)*140*S.cam3.K,seg(T.resume,T.resume+.5)*60*S.cam3.K,'#ffffff');ditherFill(1-seg(T.resume,T.resume+.25),'#e8e0ff')}
+  if(s.phase==='B')ditherFill(.12,'#9a96c8'); // grano de tiempo detenido
+  S.rain(.3); // dentro del render: en el tiempo congelado la lluvia también queda quieta
+  if(s.phase==='Z')ditherFill(seg(T.dark,T.close),'#000');
+}
+
+// ---------- sonido ----------
+const X=S.sfx;
+const sfx=[
+  [.12,()=>{S.tone(1.4,'sine',1320,1300,.08);S.tone(1.4,'sine',1327,1307,.06)}],
+  [T.rise,()=>{S.noise(.9,'lowpass',300,900,.3,1,true);[0,1,2,3].forEach(i=>setTimeout(()=>S.tone(.12,'sine',900+i*140,500,.15),i*180))}],
+  [T.turn,X.swish],
+  [T.swing,()=>X.rise(.25)],
+  [T.imp,()=>{X.boom();for(let i=0;i<6;i++)setTimeout(()=>S.tone(.25,'triangle',2400+Math.random()*2400,1800,.08),i*35);S.noise(.4,'highpass',4000,9000,.5)}],
+  [T.bullet,()=>{S.tone(2,'sine',55,50,.5);S.noise(2,'lowpass',400,200,.15)}],
+  [T.bullet+.8,X.heartbeat],[T.bullet+1.6,X.heartbeat],
+  [T.resume-.25,()=>S.noise(.25,'highpass',400,6000,.3,1,true)],
+  [T.resume,X.bigBoom],
+  [T.resume+.2,()=>S.noise(.6,'lowpass',1200,200,.3)],
+  [T.talk,()=>S.tone(1.2,'sine',220,215,.1)],
+  [9.0,()=>{S.tone(1,'sine',1320,1300,.06)}]
+];
+const drone=s=>({O:.03,R:.1,T:.15,P:.25,H:0,C:0,B:.05,X:.15,S:.05,Z:.03,E:.02}[s.phase]??0);
+const ambience=s=>{const hush=s.freeze!=null||s.phase==='C'||s.phase==='O'||s.phase==='E';return{rain:hush?0:.07,wind:hush?0:.03,windFreq:320}};
+
+S.start({
+  loop:LOOP,vertical:true,reducedT:4.6,no2dSmears:true,
+  chars:{blue:BLUE,red:RED,green:GREEN,shade:SHADE},
+  state,wind,render,sfx,drone,ambience,
+  setCam:s=>S.setCam3(s.cam3||{}),simulate:T=>S.simulate3(T),
+  subs:[[T.talk,T.dark,'—Ya empezó.','始まった']],
+  hook:[[0,1.0,'NO ES UN REFLEJO','反射じゃない']],
+  el:{stage:document.getElementById('stage'),canvas:document.getElementById('c'),toggle:document.getElementById('toggle'),
+      sound:document.getElementById('sound'),sub:document.getElementById('sub'),hook:document.getElementById('hook')}
+});
+})();
+</script>
+</body></html>

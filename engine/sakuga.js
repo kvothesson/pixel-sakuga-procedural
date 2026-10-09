@@ -285,6 +285,8 @@ E.wetFloor=function(gy,{strength=.55,maxD,amp=1,extra,extraLevel=1}={}){
 E.beam=function(a,c,w,col,lite){const f=Math.floor(E.t*24),dx=c[0]-a[0],dy=c[1]-a[1],d=Math.hypot(dx,dy)||1,nx=-dy/d,ny=dx/d;
   for(const[ww,cc]of[[w,col],[w*.6,lite],[w*.25,'#ffffff']]){const n=8;let px=a[0],py=a[1];
     for(let i=1;i<=n;i++){const q=i/n,j=Math.sin(f*1.7+i*2.1)*w*.18*(i<n?1:0),qx=a[0]+dx*q+nx*j,qy=a[1]+dy*q+ny*j;line(px,py,qx,qy,Math.max(1,ww),cc);px=qx;py=qy}}};
+E.withLayer=fn=>{lb.clearRect(0,0,E.PW,E.PH);const keep=b;b=lb;fn();b=keep;return lb};
+E.ctx=()=>b;
 Object.assign(E,{figure,dissolve,ditherEllipse,shadow});
 
 // ---------- efectos ----------
@@ -445,10 +447,10 @@ function frame(){
   if(!E.PW)return null;
   const s=scene.state(E.t);b.clearRect(0,0,E.PW,E.PH);
   const realT=E.t;if(s.freeze!=null)E.t=s.freeze; // hit-stop: el mundo se congela
-  setCam(s.cam||{});
+  setCam(s.cam||{});if(scene.setCam)scene.setCam(s);
   const T=Math.floor(E.t*12)/12; // la física también va en twos
-  if(s.freeze==null){const L=scene.loop,ps=scene.state(((E.t-1/12)%L+L)%L);E.prevChars=Object.fromEntries((ps.chars||[]).map(c=>[c.id,c]))}else E.prevChars=null;
-  if(E._simT!==T){E.chainCache=simulate(T);E._simT=T}
+  if(s.freeze==null&&!scene.no2dSmears){const L=scene.loop,ps=scene.state(((E.t-1/12)%L+L)%L);E.prevChars=Object.fromEntries((ps.chars||[]).map(c=>[c.id,c]))}else E.prevChars=null;
+  if(E._simT!==T){E.chainCache=scene.simulate?scene.simulate(T):simulate(T);E._simT=T}
   scene.render(s);
   if(E.cam.rot)rotateBuffer(E.cam.rot);
   E.t=realT;
@@ -464,7 +466,7 @@ function resize(){
   E.u=scene.vertical?E.PW/220:E.PH/420;E._simT=null;frame();
 }
 E.start=function(sc){
-  scene=sc;stageEl=sc.el.stage;cv=sc.el.canvas;ctx=cv.getContext('2d');
+  scene=sc;E.scene=sc;stageEl=sc.el.stage;cv=sc.el.canvas;ctx=cv.getContext('2d');
   buf=document.createElement('canvas');b=buf.getContext('2d');layer=document.createElement('canvas');lb=layer.getContext('2d');
   const btn=sc.el.toggle,setRun=v=>{E.running=v;btn.textContent=v?'❚❚ PAUSA':'▶ PLAY';last=0};
   btn.onclick=()=>setRun(!E.running);stageEl.onclick=()=>setRun(!E.running);

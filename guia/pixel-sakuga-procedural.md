@@ -263,3 +263,29 @@ Sakuga.start({
 - Si dos aliados disparan desde el mismo lado, alinearlos en la misma línea hace que el rayo de atrás le cruce el cuerpo al de adelante, y se lee como que lo ataca.
 - Composición de combo: **el de adelante, agachado** (`lowcharge` / `lowfire`), y **el de atrás, de pie**, disparando por encima de su cabeza. Los rayos convergen en el blanco desde dos alturas.
 - Regla general: antes de dibujar un proyectil, revisar que su trayectoria no pase por la silueta de un personaje que no es el objetivo.
+
+---
+
+## 14. Ep. 7 — esqueleto 3D proyectado (`engine/sakuga3d.js`)
+
+El salto de paradigma recomendado en la sección 13. El mismo pixel art, pero ahora con profundidad.
+
+- **Convención:** x es adelante del personaje (`yaw` 0 mira a +x), y apunta hacia abajo (el piso está en y=0) y z va hacia la cámara. `yaw = π/2` es mirar de frente a cámara.
+- **Las poses 2D sirven tal cual:** `to3` les agrega profundidad (lado izquierdo z−, derecho z+). Toda la biblioteca de poses se reutiliza.
+- **Cámara orbital** (`setCam3({yaw, pitch, D, tx, ty, tz, zoom})`) con perspectiva: los objetos a distancia `D` del objetivo quedan en escala 1 y los más cercanos crecen.
+- **Dibujo por grupos ordenados por profundidad:** cada pierna, cada brazo, el cuerpo y cada cadena es un grupo con su propio contorno. Un brazo delante del torso se separa con línea, pero las articulaciones de un mismo miembro no se cortan.
+- **Torso = envolvente convexa** de 13 puntos (hombros, pecho, cintura, cadera). Funciona desde cualquier ángulo.
+- **Cara según orientación** (`facing3`): dos ojos de frente, uno de perfil, ninguno de espaldas. La capucha muestra la cara solo si mira hacia cámara.
+- **Física 3D** (`simulate3`): las mismas cadenas Verlet, con profundidad y viento en z.
+- **Mundo:**
+  - `floor3` dibuja la grilla en perspectiva, que es lo que más vende la profundidad cuando la cámara gira.
+  - `skyline3` y `moon3` ubican la ciudad y la luna por acimut, así rotan con la cámara.
+  - `shadow3` proyecta la sombra en el piso.
+  - `reflect3` refleja a cada personaje sobre su propio pie (correcto para un piso plano, a diferencia del espejo de horizonte 2D).
+- **Recursos nuevos:**
+  - *Puño contra la cámara:* el personaje mira a cámara (`yaw ≈ π/2`), la cámara se pone a un brazo y medio (`D ≈ 118`) con zoom alto. El puño crece por perspectiva. Usar un guante claro: un puño negro sobre un cuerpo negro no se lee.
+  - *Vidrio roto* (`glassCrack`): grietas radiales y arcos desde el punto de impacto, como si el golpe rompiera la pantalla.
+  - *Tiempo congelado con cámara orbitando:* `freeze` en el state congela el mundo (también la lluvia, si se dibuja dentro de `render`) mientras la cámara, que sale del tiempo real, da la vuelta.
+  - *Salir o hundirse en el charco:* recortar el dibujo en la línea del piso (`clip`) y agregar ondas en la base.
+- **Lección de cámara:** con `pitch` 0 y los personajes casi en fila, la profundidad no se nota. Un `pitch` de 0,15 a 0,25 (mirar un poco hacia abajo) muestra el piso y las distancias.
+- **Laboratorio 3D:** `escenas/lab3d/` muestra un giro de 360°, una órbita alrededor de un golpe y un puño a cámara, sobre fondo claro.

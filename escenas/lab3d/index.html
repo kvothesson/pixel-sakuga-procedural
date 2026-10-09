@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laboratorio 3D</title>
+<style>:root{color-scheme:dark}html,body{background:#07050d;margin:0;color:#ccc;font-family:monospace}body{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px}
+.stage{position:relative;width:min(100%,420px);aspect-ratio:9/16;background:#000}canvas{width:100%;height:100%;image-rendering:pixelated;display:block}</style>
+</head><body>
+<div class="stage" id="stage"><canvas id="c"></canvas><div id="sub"></div></div>
+<button id="toggle" type="button">❚❚ PAUSA</button>
+<!-- 0-4 s: gira 360° sobre sí mismo · 4-8 s: la cámara orbita un golpe · 8-10 s: puño hacia la cámara -->
+<script src="../../engine/sakuga.js"></script>
+<script src="../../engine/sakuga3d.js"></script>
+<script>
+const S=window.Sakuga,{P}=S;
+const RED={head:'hair',pal:{coat:'#4a1222',coatD:'#2c0a14',pants:'#261018',pantsD:'#1c0810',boot:'#120508',skin:'#e0b090',glove:'#e0b090',hair:'#15060c',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
+  chains:[{key:'coat',anchor:'hip',off:[-5,-5,0],n:3,len:8,w:[8,11],col:'coatD',grav:1.3},{key:'pony',anchor:'head',off:[-6,-6,0],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}]};
+const BLUE={head:'hood',pal:{coat:'#232a5c',coatD:'#161a3c',pants:'#1a1d3a',pantsD:'#13152c',boot:'#0c0d1c',skin:'#f0c4a0',glove:'#d8e8ff',hood:'#1b2350',hair:'#2a3060',aura:'#4fb4ff',dark:'#1f5fa8'},chains:[]};
+function state(t){
+  const s={phase:'lab',cam:{},cam3:{zoom:1.6,yaw:0,ty:-50},chars:[]};
+  if(t<4)s.chars=[{id:'red',pose:P.stance,x:0,z:0,yaw:S.q12(t)/4*Math.PI*2}];
+  else if(t<8){s.chars=[{id:'red',pose:P.strike,x:-30,z:0,yaw:0},{id:'blue',pose:P.block,x:30,z:0,yaw:Math.PI}];s.cam3={zoom:1.3,yaw:(t-4)/4*Math.PI*2,ty:-55}}
+  else{const k=S.ease(S.clamp((S.q24(t)-8)/.5));s.chars=[{id:'red',pose:S.lerpPose(P.stance,P.strike,k),x:-6,z:-10,yaw:Math.PI/2*.88}];s.cam3={zoom:.9,yaw:0,ty:-70,D:92,tx:0,tz:-10}}
+  return s}
+function render(s){S.R(0,0,S.PW,S.PH,'#d8d2e6');S.floor3('#a89cc0','#8a7ca8',200,40);for(const c of s.chars)S.shadow3(c);
+  const sorted=s.chars.slice().sort((a,b)=>S.proj(b.x,-50,b.z||0)[3]-S.proj(a.x,-50,a.z||0)[3]);for(const c of sorted)S.figure3(c,'plain')}
+S.start({loop:10,vertical:true,state,render,setCam:s=>S.setCam3(s.cam3),simulate:T=>S.simulate3(T),no2dSmears:true,wind:t=>[-150,-40,0],
+  chars:{red:RED,blue:BLUE},el:{stage:stage,canvas:c,toggle:toggle,sub:document.getElementById('sub')}});
+</script></body></html>

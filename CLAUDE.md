@@ -16,6 +16,7 @@ Escenas de acción con dirección de anime (sakuga) en pixel art generado por c�
 
 ## Estructura
 - `engine/sakuga.js`: motor compartido (primitivas, cámara, poses, física Verlet, efectos, sonido, runtime). Las escenas nuevas se construyen sobre él.
+- `engine/sakuga3d.js`: extensión 3D (cámara orbital, esqueleto con profundidad y giro, física 3D, piso en perspectiva). Se carga después del motor.
 - `tools/bundle.py`: inlinea el motor y deja una escena en un único HTML para compartirla.
 - `guia/`: la guía viva de la técnica.
 - `escenas/<nombre>/index.html`: una escena por carpeta, abrible directo en el navegador o con GitHub Pages.
@@ -28,7 +29,7 @@ Abrirla con Playwright, pausar, llamar `window.__seek(t)` en 6 a 12 momentos cla
 ## Próximos pasos
 Cada vuelta de mejora es un episodio nuevo; frenar al final de cada uno para que el usuario lo vea.
 El rig 2D de perfil llegó a su techo (ver guía, sección 13). Los saltos que quedan son de paradigma:
-1. Esqueleto 3D proyectado y pixelado (giros, escorzo, vistas 3/4, cámara que orbita).
+1. ~~Esqueleto 3D proyectado~~ hecho en el Ep. 7 (`engine/sakuga3d.js`). Siguiente: luz por píxel y caminata con IK en 3D.
 2. Editor visual de poses y timeline.
 3. Retratos de alta resolución para primeros planos de rostro.
 Todo movimiento nuevo pasa antes por `escenas/lab/` (fondo claro, cuadro por cuadro).
