@@ -187,3 +187,16 @@ Sakuga.start({
 - **Arcos (en el motor, para todas las escenas):** `lerpPose` interpola cada hueso por ángulo alrededor de su padre. Los miembros barren en curva y no se acortan. `lerpPoseLinear` queda para casos puntuales.
 - **Smears automáticos:** si una mano o un pie avanza más de 18 unidades entre cuadros a 12 fps, el motor dibuja el arco recorrido como un trazo que se afina, con contorno y borde de luz incluidos.
 - **Lección de física:** una cadena con poca amortiguación queda como un palo cuando el ancla baja de golpe. Para bufandas y coletas conviene `damp` entre 0,88 y 0,9 y `grav` cerca de 1.
+
+---
+
+## 10. Ep. 4 — anatomía
+
+- **`poly(pts)`:** relleno por líneas de barrido, sin antialias. Es la base de toda forma que no sea una línea o un círculo.
+- **`limb(a, b, wa, wb)`:** trapecio más articulaciones redondeadas. Los miembros se afinan hacia los extremos (muslo 12 → rodilla 9 → tobillo 5,5), y los brazos igual (8 → 6,5 → 5).
+- **Torso de 6 puntos:** hombros (10,5 de medio ancho), cintura (7) y cadera (8), con hombros redondeados con discos. Pasar del tubo al torso es lo que más "humaniza".
+- **Pies con punta** (8 unidades hacia adelante, color `boot`), **cuello** (`neck` o piel) y **pierna trasera más oscura** (`pantsD`) para leer la profundidad.
+- El contorno y el borde de luz salen solos: la misma geometría se dibuja con los anchos agrandados (`+o`).
+- **Cadenas que arrancan colgando:** si una cadena aparece estirada en horizontal tarda en caer y parece un brazo o un arma. Ahora se inicializa casi vertical.
+- **Personaje sin cara:** con capucha, máscara oscura y dos ojos de color, el misterio se sostiene y no hace falta dibujar rasgos.
+- **Ep. 4 en sí:** cae desde la antena con speed lines verticales, aterriza con una onda elíptica, grietas y un congelado, frena dos golpes a la vez con una cúpula, y la onda despide a ambos con chispas de derrape. Cierra con los diálogos "¿Juntos?" / "…Por esta vez.", que anuncian una alianza para el próximo episodio.

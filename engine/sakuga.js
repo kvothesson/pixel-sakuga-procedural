@@ -42,7 +42,16 @@ function pixText(str,x,y,size,c){
   const d=tc.getImageData(0,0,w,h).data;b.fillStyle=c;const ox=Math.round(x-w/2),oy=Math.round(y-h/2);
   for(let j=0;j<h;j++)for(let i=0;i<w;i++)if(d[(j*w+i)*4+3]>110)b.fillRect(ox+i,oy+j,1,1);
 }
-Object.assign(E,{R,line,disc,ring,ditherDisc,ditherFill,pixText});
+// relleno de polígono por líneas de barrido: sin antialias, pixel-exacto
+function poly(pts,c){let y0=Infinity,y1=-Infinity;for(const p of pts){y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1])}b.fillStyle=c;const n=pts.length;
+  for(let y=Math.floor(y0);y<=Math.ceil(y1);y++){const yc=y+.5,xs=[];
+    for(let i=0;i<n;i++){const p=pts[i],q=pts[(i+1)%n];if((p[1]<=yc&&q[1]>yc)||(q[1]<=yc&&p[1]>yc))xs.push(p[0]+(yc-p[1])/(q[1]-p[1])*(q[0]-p[0]))}
+    xs.sort((a,c)=>a-c);for(let i=0;i+1<xs.length;i+=2){const xa=Math.round(xs[i]),xb=Math.round(xs[i+1]);if(xb>xa)b.fillRect(xa,y,xb-xa,1)}}}
+// miembro que se afina: trapecio + articulaciones redondeadas
+function limb(a,c,wa,wc,col){const dx=c[0]-a[0],dy=c[1]-a[1],d=Math.hypot(dx,dy)||1,nx=-dy/d,ny=dx/d;
+  poly([[a[0]+nx*wa/2,a[1]+ny*wa/2],[c[0]+nx*wc/2,c[1]+ny*wc/2],[c[0]-nx*wc/2,c[1]-ny*wc/2],[a[0]-nx*wa/2,a[1]-ny*wa/2]],col);
+  disc(a[0],a[1],wa/2-.3,col);disc(c[0],c[1],wc/2-.3,col)}
+Object.assign(E,{R,line,disc,ring,ditherDisc,ditherFill,pixText,poly,limb});
 
 // ---------- cámara ----------
 const toPx=(wx,wy)=>[E.cam.cx+(wx-E.cam.camX)*E.cam.k,E.cam.cy+(wy-E.cam.camY)*E.cam.k];
@@ -76,6 +85,8 @@ E.P={
  kick:{hip:[0,-48],chest:[-12,-73],head:[-17,-86],lE:[-24,-62],lH:[-32,-50],rE:[2,-64],rH:[-4,-54],lK:[-3,-24],lF:[-6,0],rK:[24,-62],rF:[48,-80]},
  lean:{hip:[0,-42],chest:[-12,-66],head:[-21,-78],lE:[-24,-58],lH:[-30,-46],rE:[-2,-60],rH:[6,-52],lK:[-14,-22],lF:[-26,0],rK:[12,-24],rF:[22,0]},
  duck:{hip:[0,-24],chest:[8,-44],head:[14,-56],lE:[14,-40],lH:[22,-50],rE:[18,-36],rH:[26,-44],lK:[-14,-12],lF:[-26,0],rK:[16,-18],rF:[22,0]},
+ land:{hip:[0,-26],chest:[8,-50],head:[14,-63],lE:[-6,-40],lH:[-4,-28],rE:[22,-36],rH:[26,-2],lK:[16,-16],lF:[22,0],rK:[-14,-6],rF:[-28,0]},
+ dualblock:{hip:[0,-44],chest:[0,-72],head:[0,-87],lE:[-15,-73],lH:[-29,-76],rE:[15,-73],rH:[29,-76],lK:[-14,-22],lF:[-26,0],rK:[14,-22],rF:[26,0]},
  after:{hip:[0,-27],chest:[9,-51],head:[15,-64],lE:[-4,-42],lH:[-22,-40],rE:[22,-38],rH:[32,-4],lK:[-20,-14],lF:[-34,0],rK:[15,-25],rF:[13,0]}
 };
 // interpolación por ARCOS: cada hueso rota alrededor de su padre (no se acorta ni corta camino en línea recta)
@@ -109,7 +120,7 @@ function simulate(T){
       for(const spec of def.chains){
         const a=chainAnchor(ch,spec),key=ch.id+spec.key,pa=prevA[key];let nodes=r.chains[spec.key];
         if(!nodes||!pa||Math.hypot(a[0]-pa[0],a[1]-pa[1])>70){
-          nodes=[];for(let j=0;j<=spec.n;j++){const p=[a[0]-(ch.dir||1)*j*spec.len*.9,a[1]+j*spec.len*.3];nodes.push({p,o:[p[0],p[1]]})}
+          nodes=[];for(let j=0;j<=spec.n;j++){const p=[a[0]-(ch.dir||1)*j*spec.len*.35,a[1]+j*spec.len*.92];nodes.push({p,o:[p[0],p[1]]})} // arranca colgando
           r.chains[spec.key]=nodes;
         }
         prevA[key]=a;nodes[0].p=[a[0],a[1]];nodes[0].o=[a[0],a[1]];
@@ -149,11 +160,19 @@ function figure(ch,mode='glow',inkCol){
     for(const sm of smears)for(let i=0;i<sm.path.length-1;i++){const q=(i+1)/sm.path.length;L([sm.path[i][0]+E.SHX,sm.path[i][1]],[sm.path[i+1][0]+E.SHX,sm.path[i+1][1]],(sm.w*2*q)*k+o,col(pal[sm.c]))}
     for(const{sp,pts}of chains){if(sp.front)continue;for(let i=0;i<pts.length-1;i++){const w=lerp(sp.w[0],sp.w[1],i/(pts.length-1));
       L(pts[i],pts[i+1],w*k+o,col(sp.tipFrom!=null&&i>=sp.tipFrom?pal[sp.tip]:pal[sp.col]))}}
-    L(J.hip,J.lK,10*k+o,col(pal.pants));L(J.lK,J.lF,8*k+o,col(pal.pants));
-    L(J.hip,J.rK,10*k+o,col(pal.pants));L(J.rK,J.rF,8*k+o,col(pal.pants));
-    L(J.chest,J.lE,7*k+o,col(pal.coatD));L(J.lE,J.lH,6*k+o,col(pal.coatD));
-    L(J.hip,J.chest,15*k+o,col(pal.coat));
-    L(J.chest,J.rE,7*k+o,col(pal.coat));L(J.rE,J.rH,6*k+o,col(pal.coat));
+    // ANATOMÍA: muslos y brazos que se afinan, pies con punta, torso con hombros y cintura, cuello
+    const W=(u)=>u*k+o;
+    const leg=(K,F,toe,c)=>{limb(J.hip,J[K],W(12),W(9),c);limb(J[K],J[F],W(9),W(5.5),c);limb(J[F],toe,W(5.5),W(3.5),col(pal.boot||pal.pants))};
+    leg('lK','lF',pt([p.lF[0]+8,p.lF[1]]),col(pal.pantsD||pal.pants));
+    limb(J.chest,J.lE,W(8),W(6.5),col(pal.coatD));limb(J.lE,J.lH,W(6.5),W(5),col(pal.coatD));
+    leg('rK','rF',pt([p.rF[0]+8,p.rF[1]]),col(pal.pants));
+    {const sx=J.chest[0]-J.hip[0],sy=J.chest[1]-J.hip[1],d=Math.hypot(sx,sy)||1,nx=-sy/d,ny=sx/d,wv=(h)=>(h*k+o/2);
+      const mid=[(J.chest[0]+J.hip[0])/2,(J.chest[1]+J.hip[1])/2],top=[J.chest[0]+sx/d*3*k,J.chest[1]+sy/d*3*k];
+      poly([[top[0]+nx*wv(10.5),top[1]+ny*wv(10.5)],[mid[0]+nx*wv(7),mid[1]+ny*wv(7)],[J.hip[0]+nx*wv(8),J.hip[1]+ny*wv(8)],
+            [J.hip[0]-nx*wv(8),J.hip[1]-ny*wv(8)],[mid[0]-nx*wv(7),mid[1]-ny*wv(7)],[top[0]-nx*wv(10.5),top[1]-ny*wv(10.5)]],col(pal.coat));
+      disc(top[0]+nx*wv(7),top[1]+ny*wv(7),wv(4),col(pal.coat));disc(top[0]-nx*wv(7),top[1]-ny*wv(7),wv(4),col(pal.coat));}
+    limb(J.chest,J.head,W(5.5),W(5),col(pal.neck||pal.skin));
+    limb(J.chest,J.rE,W(8),W(6.5),col(pal.coat));limb(J.rE,J.rH,W(6.5),W(5),col(pal.coat));
     disc(J.lH[0],J.lH[1],4.5*k+o/2,col(pal.glove));disc(J.rH[0],J.rH[1],5*k+o/2,col(pal.glove));
     if(def.head==='hood'&&!ch.hoodDown){
       const back=pt([hx-15,hy-4]);L(J.head,back,7*k+o,col(pal.hood));
