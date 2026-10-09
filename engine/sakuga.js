@@ -130,6 +130,7 @@ function kneesForward(p){
     const fwd=-dy; // dirección "adelante" perpendicular a la línea (mirando a la derecha)
     if(cross*Math.sign(dy||1)>0&&dy>0){const t=(kx*dx+ky*dy)/L,px=t*dx,py=t*dy;p[K]=[H[0]+2*px-kx,H[1]+2*py-ky]}}
   return p}
+E.ikLeg=ikLeg;
 E.plantPose=ch=>{const p={};for(const j in ch.pose)p[j]=ch.pose[j].slice();kneesForward(p);if(!ch.plant)return p;
   if(ch.plant.lF)ikLeg(p,'lK','lF',E.localPt(ch,ch.plant.lF));if(ch.plant.rF)ikLeg(p,'rK','rF',E.localPt(ch,ch.plant.rF));return p};
 // marcha procedural: cada pie queda clavado en el piso mientras el cuerpo avanza, y después vuela en arco al próximo apoyo
@@ -216,7 +217,8 @@ function figure(ch,mode='glow',inkCol){
       poly([[top[0]+nx*wv(10.5),top[1]+ny*wv(10.5)],[mid[0]+nx*wv(7),mid[1]+ny*wv(7)],[J.hip[0]+nx*wv(8),J.hip[1]+ny*wv(8)],
             [J.hip[0]-nx*wv(8),J.hip[1]-ny*wv(8)],[mid[0]-nx*wv(7),mid[1]-ny*wv(7)],[top[0]-nx*wv(10.5),top[1]-ny*wv(10.5)]],col(pal.coat));
       disc(top[0]+nx*wv(7),top[1]+ny*wv(7),wv(4),col(pal.coat));disc(top[0]-nx*wv(7),top[1]-ny*wv(7),wv(4),col(pal.coat));}
-    limb(J.chest,J.head,W(5.5),W(5),col(pal.neck||pal.skin));
+    {const sx=J.chest[0]-J.hip[0],sy=J.chest[1]-J.hip[1],d=Math.hypot(sx,sy)||1,nb=[J.chest[0]+sx/d*4*k,J.chest[1]+sy/d*4*k];
+      limb(nb,J.head,W(7),W(6.5),col(pal.neck||pal.skin));disc(J.chest[0]+sx/d*2.5*k,J.chest[1]+sy/d*2.5*k,6*k+o/2,col(pal.coat))}
     limb(J.chest,J.rE,W(8),W(6.5),col(pal.coat));limb(J.rE,J.rH,W(6.5),W(5),col(pal.coat));
     // puños: chicos y alargados en la dirección del antebrazo (una bola grande se lee mal)
     const fist=(E2,H2,r)=>{const dx=J[H2][0]-J[E2][0],dy=J[H2][1]-J[E2][1],d=Math.hypot(dx,dy)||1;

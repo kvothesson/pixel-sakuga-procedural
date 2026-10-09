@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Otra Vez · Ep. 8</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* Layout: short vertical 9:16 centrado, gancho arriba, subtítulos abajo, controles debajo. Look nocturno fijo (single-theme a propósito). */
+:root{
+  --night:#07050d;
+  --ink:#ece8f6;
+  --dim:#8a83a6;
+  --blue:#4fb4ff;
+  --red:#ff2e45;
+  --green:#5bff9e;
+  --f-pixel:"DotGothic16","MS Gothic",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--ink);margin:0}
+body{font-family:var(--f-pixel);padding-inline:16px;padding-block:16px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.stage{position:relative;width:min(100%,calc(82vh * 9 / 16));aspect-ratio:9/16;max-width:100%;overflow:hidden;background:#000;cursor:pointer;border-radius:10px;box-shadow:0 0 0 2px #10261c}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.hook{position:absolute;top:13%;left:0;right:0;text-align:center;pointer-events:none;font-size:clamp(18px,6vw,30px);letter-spacing:.06em;color:#fff;
+  text-shadow:3px 0 #0f6a3a,-3px 0 #000,0 3px #000,0 -3px #000}
+.hook small{display:block;font-size:.5em;color:#ffd84a;letter-spacing:.2em;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000}
+.sub{position:absolute;left:50%;bottom:17%;transform:translateX(-50%);width:92%;text-align:center;pointer-events:none;
+  font-size:clamp(18px,5.5vw,26px);color:#fff;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000,0 -2px #000}
+.sub small{display:block;font-size:.62em;color:#ffd84a;letter-spacing:.1em}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;color:var(--dim);font-size:14px}
+button{font:inherit;color:var(--ink);background:#140d22;border:2px solid #3a2a5c;padding:6px 14px;cursor:pointer;letter-spacing:.06em}
+button:hover{border-color:var(--green);color:#fff}
+button[aria-pressed="true"]{border-color:var(--green);color:#fff}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+</style>
+</head><body>
+<div class="stage" id="stage">
+  <canvas id="c" aria-label="Short vertical en pixel art 3D: los tres de espaldas, rodeados por seis sombras; las derrotan con golpes y un remate de tres rayos"></canvas>
+  <div class="hook" id="hook"></div>
+  <div class="sub" id="sub"></div>
+</div>
+<div class="controls">
+  <button id="sound" type="button" aria-pressed="false">♪ ACTIVAR SONIDO</button>
+  <button id="toggle" type="button">❚❚ PAUSA</button>
+</div>
+<script src="../../engine/sakuga.js"></script>
+<script src="../../engine/sakuga3d.js"></script>
+<script>
+(()=>{
+const S=window.Sakuga,{P,lerp,ease,easeIn,easeOut,clamp,segAt,lerpPose,q8,q12,q24}=S;
+const LOOP=10.0;
+
+// ---------- personajes (sin faldón suelto: el abrigo largo es parte del torso) ----------
+const BLUE={head:'hood',pal:{coat:'#2a3270',coatD:'#1a1f48',pants:'#1e2244',pantsD:'#151834',boot:'#0c0d1c',skin:'#f0c4a0',glove:'#d8e8ff',hood:'#1f2858',hair:'#2a3060',tip:'#4fb4ff',aura:'#4fb4ff',dark:'#1f5fa8'},
+  chains:[{key:'braid',anchor:'head',off:[-7,-2,0],n:7,len:6,w:[3,2],col:'hair',tip:'tip',tipFrom:5,grav:1,damp:.9,when:c=>c.hoodDown}]};
+const RED={head:'hair',pal:{coat:'#5a1628',coatD:'#3a0e1a',pants:'#2c121c',pantsD:'#200a12',boot:'#120508',skin:'#e6b892',glove:'#e6b892',hair:'#1e0812',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
+  chains:[{key:'scarf',anchor:'chest',off:[-2,-3,0],n:7,len:8,w:[4,2],col:'scarf',grav:.9,damp:.88},{key:'pony',anchor:'head',off:[-6,-6,0],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}]};
+const GREEN={head:'hood',pal:{coat:'#184232',coatD:'#0e2a1f',pants:'#113024',pantsD:'#0b2219',boot:'#06120c',skin:'#0e1c16',neck:'#0e1c16',glove:'#9affc4',hood:'#184232',hair:'#184232',aura:'#5bff9e',dark:'#0f6a3a'},
+  chains:[{key:'cape',anchor:'chest',off:[-4,-2,0],n:7,len:9,w:[13,8],col:'coatD',grav:1.3,wind:.5,damp:.92}]};
+const SHADE={head:'hair',pal:{coat:'#0a0810',coatD:'#06040a',pants:'#08060c',pantsD:'#050308',boot:'#030206',skin:'#0a0810',neck:'#0a0810',glove:'#cfc8e8',hair:'#0a0810',aura:'#e8e0ff',dark:'#000'},chains:[]};
+
+// ---------- coreografía ----------
+// O de espaldas, rodeados (las sombras salen de los charcos) · A las sombras se acercan, ellos cargan
+// B cada uno golpea a una (poses clave sostenidas) · C miran a la segunda y cargan · F remate de tres rayos · H/I impacto
+// W blanco · S "¿Cuántos más?" / "Muchos." · E igual que O (la cámara dio la vuelta completa)
+const T={rise:.5,approach:1.6,fight:2.6,charge:4.4,fire:5.0,hit:5.4,imp:5.48,white:5.9,calm:6.3,q1:6.6,q2:7.5,close:8.8};
+const HEROES=[['red',Math.PI/2],['blue',Math.PI/2+2*Math.PI/3],['green',Math.PI/2+4*Math.PI/3]];
+const STRIKE={red:[2.8,'jab'],blue:[3.25,'upper'],green:[3.7,'kick']};
+const R0=118,R1=66,STEP=18,RH=17;
+// sombra j: héroe i = floor(j/2), k = j%2 (k=0 la golpean, k=1 cae con el remate)
+const shadeAng=j=>HEROES[j>>1][1]+(j%2?.42:-.42);
+const shadeRise=j=>T.rise+j*.13;
+const camYaw=t=>-.4+Math.PI*2*t/LOOP;
+const zoomAt=t=>t<T.approach?.85:t<T.fight?lerp(.85,.8,ease(segAt(t,T.approach,T.fight))):t<T.charge?.8:t<T.fire?lerp(.8,1.3,ease(segAt(t,T.charge,T.fire))):t<T.white?1.25:lerp(1.1,.85,ease(segAt(t,T.white,T.close)));
+function heroPos(id){const a=HEROES.find(h=>h[0]===id)[1];return[Math.cos(a)*RH,Math.sin(a)*RH,a]}
+function state(t){
+  const t12=q12(t),t24=q24(t),sg=(a,c)=>segAt(t,a,c),sg12=(a,c)=>segAt(t12,a,c);
+  const s={phase:'O',cam:{},cam3:{zoom:zoomAt(t),yaw:camYaw(t),pitch:t>=T.charge&&t<T.white?lerp(.88,.25,ease(segAt(t,T.charge,T.charge+.3))):.88,ty:t>=T.charge&&t<T.white?-50:-35,D:440,cy:.5},chars:[],lights:[],sparks:[],beams:[]};
+  if(t>=T.close)s.phase='E';else if(t>=T.calm)s.phase='S';else if(t>=T.white)s.phase='W';else if(t>=T.imp)s.phase='I';else if(t>=T.hit)s.phase='H';
+  else if(t>=T.fire)s.phase='F';else if(t>=T.charge)s.phase='C';else if(t>=T.fight)s.phase='B';else if(t>=T.approach)s.phase='A';
+  // héroes
+  for(const[id,a]of HEROES){
+    const[x,z]=heroPos(id),h={id,x,z,yaw:a,pose:P.stance,hoodDown:true};
+    if(s.phase==='A')h.pose=S.keyPose(t24,[[0,P.stance],[1.75+(id==='blue'?.08:id==='green'?.16:0),P.charge]]);
+    if(s.phase==='B'){const[th,mv]=STRIKE[id],sa=shadeAng(HEROES.findIndex(q=>q[0]===id)*2);
+      h.pose=S.keyPose(t24,[[0,P.charge],[th-.22,P.crouch],[th,P[mv]],[th+.32,P.charge]]);
+      if(t>=th-.22){h.yaw=sa;if(t>=th&&t<th+.32){h.x+=Math.cos(sa)*STEP;h.z+=Math.sin(sa)*STEP}}
+      if(t>=th&&t<th+.06)s.freeze=th;}
+    if(s.phase==='C'||s.phase==='F'||s.phase==='H'||s.phase==='I'){const sa=shadeAng(HEROES.findIndex(q=>q[0]===id)*2+1);h.yaw=sa;
+      h.pose=s.phase==='C'?S.keyPose(t24,[[0,P.crouch],[T.charge+.12,P.charge]]):P.fire;}
+    if(s.phase==='W')h.pose=P.fire;
+    s.chars.push(h);
+  }
+  // sombras
+  for(let j=0;j<6;j++){
+    const a=shadeAng(j),k=j%2,i=j>>1,sh={id:'shade',key:'s'+j,yaw:a+Math.PI,pose:P.stance,x:Math.cos(a)*R0,z:Math.sin(a)*R0,y:0};
+    const tr=shadeRise(j);if(t<tr||s.phase==='E')continue;
+    if(t<tr+.6){sh.y=lerp(110,0,easeOut(sg12(tr,tr+.6)));sh.rising=1}
+    if(t>=T.approach){const d=(R0-R1)*sg12(T.approach,T.fight),g=S.gait3(d,{x0:Math.cos(a)*R0,z0:Math.sin(a)*R0,yaw:a+Math.PI,stride:48,lift:7,bob:1});
+      Object.assign(sh,{x:g.x,z:g.z,y:g.y,plant3:t<T.fight?g.plant3:null,pose:t<T.fight?lerpPose(P.walkA,P.walkB,g.swing):P.stance})}
+    if(k===0){const[th]=STRIKE[HEROES[i][0]];
+      if(t>=th){const kb=sg12(th,th+.35),r=lerp(R1,R1+50,easeOut(kb));sh.x=Math.cos(a)*r;sh.z=Math.sin(a)*r;sh.y=-Math.sin(Math.PI*kb)*26;sh.pose=P.tuck;sh.plant3=null;sh.dissolve=1-sg(th+.12,th+.5);
+        if(t<th+.2){const cp=S.w3(sh,[0,-60,0]);s.sparks.push(cp);s.lights.push({x:cp[0],y:cp[1],z:cp[2],c:[255,250,240],r:55,i:.9*(1-sg(th,th+.2))})}
+        if(sh.dissolve<=0)continue}}
+    else if(t>=T.fire+.18){sh.dissolve=1-sg(T.fire+.18,T.hit+.1);sh.white=1;if(sh.dissolve<=0)continue}
+    s.chars.push(sh);
+  }
+  // luz de la energía
+  const colors={red:[255,60,80],blue:[90,190,255],green:[100,255,170]};
+  const pc=s.phase==='A'?sg(T.approach+.1,T.fight):s.phase==='B'?.55:s.phase==='C'?.55+.45*sg(T.charge,T.fire):s.phase==='F'||s.phase==='H'?1:0;
+  if(pc>0)for(const h of s.chars.filter(c=>c.id!=='shade')){const o=S.w3(h,S.pose3(h).rH);s.lights.push({x:o[0],y:o[1],z:o[2],c:colors[h.id],r:24+pc*36,i:.3+pc*.55});s.orbs=(s.orbs||[]).concat([[o,h.id,pc]])}
+  if(s.phase==='F'||s.phase==='H')for(const h of s.chars.filter(c=>c.id!=='shade')){const o=S.w3(h,S.pose3(h).rH),j=HEROES.findIndex(q=>q[0]===h.id)*2+1,a=shadeAng(j),k=easeOut(sg(T.fire,T.fire+.2));
+    const tgt=[Math.cos(a)*R1,-62,Math.sin(a)*R1];s.beams.push([o,[lerp(o[0],tgt[0]*1.6,k),lerp(o[1],tgt[1],k),lerp(o[2],tgt[2]*1.6,k)],h.id])}
+  if(s.phase==='W')s.lights.push({x:0,y:-50,z:0,c:[255,250,240],r:240,i:1-sg(T.white,T.calm)});
+  return s;
+}
+const wind=t=>[-(160+90*Math.sin(t*1.3)),-40,40];
+
+// ---------- dibujo ----------
+const COL={red:['#ff2e45','#ffb0b8'],blue:['#4fb4ff','#c8ecff'],green:['#5bff9e','#d0ffe4']};
+function drawChar(c,mode){
+  const fy=S.proj(c.x,0,c.z||0)[1],b=S.ctx(),draw=()=>{if(c.white)S.figure3(c,'ink','#f4f0ff');else S.figure3(c,mode)};
+  const body=()=>{if(c.rising){b.save();b.beginPath();b.rect(0,0,S.PW,Math.round(fy));b.clip();draw();b.restore()}else draw()};
+  if(c.dissolve!==undefined&&c.dissolve<1)S.dissolve(c.dissolve,body);else body();
+  if(c.rising){const[px,py,ps]=S.proj(c.x,0,c.z||0),k=S.cam3.K*ps,f=Math.floor(S.t*12);for(let i=0;i<2;i++){const r=((f/12+i*.25)%.5)/.5;S.ring(px,py,(8+r*28)*k,(2+r*7)*k,r<.5?'#e8e0ff':'#5a5070')}}
+}
+function render(s){
+  const{ditherFill,disc,ring,seg}=S,t=S.t;
+  if(s.phase==='I'){S.impact3(T.imp,S.PW/2,S.PH*.45,s.chars.filter(c=>!c.white),'滅');return}
+  S.sky3(['#04030a','#08061a','#0e0a24','#1a0c26','#2a1024']);S.moon3(.9,.14,S.PW*.12);S.skyline3();
+  S.floor3('#150e1e','#2a1e3a',360,40);
+  // charcos con ondas (período LOOP/12, cierran el loop)
+  const per=LOOP/12;for(let j=0;j<6;j++){const a=shadeAng(j),[px,py,ps]=S.proj(Math.cos(a)*R0,0,Math.sin(a)*R0),k=S.cam3.K*ps,r=((t+j*per/6)%per)/per;S.ring(px,py,r*14*k,r*3.5*k,r<.5?'#6a6090':'#2a2440')}
+  // reflejos ANTES que los personajes (un reflejo no puede tapar a alguien parado más cerca)
+  S.reflect3(s.chars.filter(c=>!(c.y<0)&&!c.rising&&c.dissolve===undefined),.4);
+  for(const c of s.chars)if(!c.rising&&c.dissolve===undefined)S.shadow3(c);
+  const sorted=s.chars.slice().sort((a,b)=>S.proj(b.x,-50,b.z||0)[3]-S.proj(a.x,-50,a.z||0)[3]);
+  for(const c of sorted)drawChar(c,c.id==='shade'?'glow':'glow');
+  for(const[o,id,pc]of s.orbs||[]){const pp=S.proj(...o),r=(2+pc*4+Math.sin(t*30)*.6)*pp[2]*S.cam3.K;disc(pp[0],pp[1],r+2,COL[id][0]);disc(pp[0],pp[1],r,'#ffffff')}
+  for(const[a,b2,id]of s.beams)S.beam3(a,b2,7,COL[id][0],COL[id][1]);
+  for(const sp of s.sparks){const pp=S.proj(...sp),k=pp[2]*S.cam3.K,f=Math.floor(t*24);disc(pp[0],pp[1],6*k,'#ffffff');ring(pp[0],pp[1],12*k,12*k,'#ffffff');
+    for(let i=0;i<7;i++){const a=S.hash(f+i)*Math.PI*2,l=(12+S.hash(f*3+i)*18)*k;S.line(pp[0]+Math.cos(a)*6*k,pp[1]+Math.sin(a)*6*k,pp[0]+Math.cos(a)*l,pp[1]+Math.sin(a)*l,1,i%2?'#ffd27a':'#ffffff')}}
+  S.lightPass(s.lights);
+  if(s.phase==='C')S.focusLines('#e8e0ff',Math.round(36*seg(T.charge+.2,T.fire)),1,12,S.PW/2,S.PH*.45);
+  if(s.phase==='F'||s.phase==='H')S.focusLines('#ffffff',40,2,24,S.PW/2,S.PH*.45);
+  if(s.phase==='W')ditherFill(1-seg(T.white,T.calm),'#ffffff');
+  S.rain(.3);
+}
+
+// ---------- sonido ----------
+const X=S.sfx;
+const sfx=[
+  ...[0,1,2,3,4,5].map(j=>[shadeRise(j),()=>{S.noise(.5,'lowpass',300,900,.18,1,true);S.tone(.12,'sine',700+j*90,400,.08)}]),
+  ...[0,1,2,3].map(i=>[T.approach+.15+i*.25,()=>S.noise(.06,'lowpass',700,200,.3)]),
+  [1.75,()=>{S.tone(1,'sawtooth',110,165,.08);S.tone(1,'sawtooth',147,220,.06)}],
+  ...Object.values(STRIKE).flatMap(([th])=>[[th-.22,X.swish],[th,()=>{X.tap();X.boom()}]]),
+  [T.charge,()=>{S.tone(.7,'sawtooth',110,220,.12);S.tone(.7,'sawtooth',165,330,.1);S.tone(.7,'sawtooth',220,440,.08)}],
+  [T.fire,()=>{X.whoosh(.4);S.noise(.6,'bandpass',600,2400,.5,1.2)}],
+  [T.imp,X.boom],[T.white,()=>{X.bigBoom();S.tone(1.4,'sine',880,870,.1)}],
+  [T.q1,X.heartbeat]
+];
+const drone=s=>({O:.03,A:.12,B:.2,C:.3,F:.35,H:0,I:0,W:.08,S:.04,E:.03}[s.phase]??0);
+const ambience=s=>{const hush=s.freeze!=null||s.phase==='I'||s.phase==='H';return{rain:hush?0:.07,wind:hush?0:.03,windFreq:320}};
+
+S.start({
+  loop:LOOP,vertical:true,reducedT:3.72,no2dSmears:true,
+  chars:{blue:BLUE,red:RED,green:GREEN,shade:SHADE},
+  state,wind,render,sfx,drone,ambience,
+  setCam:s=>S.setCam3(s.cam3||{}),simulate:T=>S.simulate3(T),
+  subs:[[T.q1,T.q2,'—¿Cuántos más?','あと何体だ'],[T.q2,T.close-.2,'—Muchos.','大勢だ']],
+  hook:[[0,1.2,'RODEADOS','囲まれた']],
+  el:{stage:document.getElementById('stage'),canvas:document.getElementById('c'),toggle:document.getElementById('toggle'),
+      sound:document.getElementById('sound'),sub:document.getElementById('sub'),hook:document.getElementById('hook')}
+});
+})();
+</script>
+</body></html>

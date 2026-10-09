@@ -12,10 +12,11 @@
 <script>
 const S=window.Sakuga,{P}=S;
 const RED={head:'hair',pal:{coat:'#4a1222',coatD:'#2c0a14',pants:'#261018',pantsD:'#1c0810',boot:'#120508',skin:'#e0b090',glove:'#e0b090',hair:'#15060c',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
-  chains:[{key:'coat',anchor:'hip',off:[-5,-5,0],n:3,len:8,w:[8,11],col:'coatD',grav:1.3},{key:'pony',anchor:'head',off:[-6,-6,0],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}]};
+  chains:[{key:'pony',anchor:'head',off:[-6,-6,0],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}]};
 const BLUE={head:'hood',pal:{coat:'#232a5c',coatD:'#161a3c',pants:'#1a1d3a',pantsD:'#13152c',boot:'#0c0d1c',skin:'#f0c4a0',glove:'#d8e8ff',hood:'#1b2350',hair:'#2a3060',aura:'#4fb4ff',dark:'#1f5fa8'},chains:[]};
 function state(t){
   const s={phase:'lab',cam:{},cam3:{zoom:1.6,yaw:0,ty:-50},chars:[]};
+  if(t>=10)return s;
   if(t<4)s.chars=[{id:'red',pose:P.stance,x:0,z:0,yaw:S.q12(t)/4*Math.PI*2}];
   else if(t<8){s.chars=[{id:'red',pose:P.strike,x:-30,z:0,yaw:0},{id:'blue',pose:P.block,x:30,z:0,yaw:Math.PI}];s.cam3={zoom:1.3,yaw:(t-4)/4*Math.PI*2,ty:-55}}
   else{const k=S.ease(S.clamp((S.q24(t)-8)/.5));s.chars=[{id:'red',pose:S.lerpPose(P.stance,P.strike,k),x:-6,z:-10,yaw:Math.PI/2*.88}];s.cam3={zoom:.9,yaw:0,ty:-70,D:92,tx:0,tz:-10}}

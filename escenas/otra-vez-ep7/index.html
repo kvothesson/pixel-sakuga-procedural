@@ -52,13 +52,13 @@ const LOOP=9.6;
 const BLUE={head:'hood',
   pal:{coat:'#232a5c',coatD:'#161a3c',pants:'#1a1d3a',pantsD:'#13152c',boot:'#0c0d1c',skin:'#f0c4a0',glove:'#d8e8ff',hood:'#1b2350',hair:'#2a3060',tip:'#4fb4ff',aura:'#4fb4ff',dark:'#1f5fa8'},
   chains:[
-    {key:'coat',anchor:'hip',off:[-5,-5],n:3,len:8,w:[8,11],col:'coatD',grav:1.3,wind:.8},
+    ,
     {key:'braid',anchor:'head',off:[-7,-2],n:7,len:6,w:[3,2],col:'hair',tip:'tip',tipFrom:5,grav:1,damp:.9,when:c=>c.hoodDown}
   ]};
 const RED={head:'hair',
   pal:{coat:'#4a1222',coatD:'#2c0a14',pants:'#261018',pantsD:'#1c0810',boot:'#120508',skin:'#e0b090',glove:'#e0b090',hair:'#15060c',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
   chains:[
-    {key:'coat',anchor:'hip',off:[-5,-5],n:3,len:8,w:[8,11],col:'coatD',grav:1.3,wind:.8},
+    ,
     {key:'scarf',anchor:'chest',off:[-2,-3],n:7,len:8,w:[4,2],col:'scarf',grav:.9,damp:.88},
     {key:'pony',anchor:'head',off:[-6,-6],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}
   ]};
@@ -67,7 +67,7 @@ const GREEN={head:'hood',
   chains:[{key:'cape',anchor:'chest',off:[-3,-2],n:7,len:9,w:[13,7],col:'coatD',grav:1.3,wind:.55,damp:.92}]};
 
 const SHADE={head:'hair',pal:{coat:'#06040a',coatD:'#030206',pants:'#06040a',pantsD:'#030206',boot:'#020104',skin:'#06040a',neck:'#06040a',glove:'#cfc8e8',hair:'#06040a',aura:'#e8e0ff',dark:'#000'},
-  chains:[{key:'coat',anchor:'hip',off:[-5,-5,0],n:3,len:8,w:[8,11],col:'coatD',grav:1.3}]};
+  chains:[]};
 
 // ---------- coreografía 3D ----------
 // O ojos blancos se abren · R la sombra sube del charco (la cámara orbita) · T todos giran hacia ella · P puño contra la cámara

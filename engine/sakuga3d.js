@@ -27,6 +27,17 @@ const ZD={hip:0,chest:0,head:0,lE:-8,lH:-7,rE:8,rH:7,lK:-5,lF:-5,rK:5,rF:5};
 E.to3=pose=>{const o={};for(const j in pose){const p=pose[j];o[j]=p.length===3?p.slice():[p[0],p[1],ZD[j]||0]}return o};
 E.w3=(ch,[lx,ly,lz])=>{const cs=Math.cos(ch.yaw||0),sn=Math.sin(ch.yaw||0);return[ch.x+lx*cs-lz*sn,(ch.y||0)+ly,(ch.z||0)+lx*sn+lz*cs]};
 // cuánto mira el personaje hacia la cámara (1 de frente, 0 de perfil, −1 de espaldas)
+// pies clavados en 3D: ch.plant3 = {lF:[x,y,z], rF:[x,y,z]} en mundo; la IK se resuelve en el plano del personaje
+E.pose3=ch=>{const p2=E.plantPose({pose:ch.pose});
+  if(ch.plant3)for(const[K2,F]of[['lK','lF'],['rK','rF']]){const w=ch.plant3[F];if(!w)continue;const dx=w[0]-ch.x,dz=w[2]-(ch.z||0),yw=ch.yaw||0;
+    E.ikLeg(p2,K2,F,[dx*Math.cos(yw)+dz*Math.sin(yw),w[1]-(ch.y||0)])}
+  return E.to3(p2)};
+// marcha en cualquier dirección del piso: usa la marcha 2D sobre el eje (cos yaw, sin yaw) y separa los pies a los costados
+E.gait3=function(d,{x0,z0,yaw=0,...o}){const g=E.gait(d,{x0:0,dir:1,...o}),c=Math.cos(yaw),sn=Math.sin(yaw),side=(v,s2)=>[x0+c*v[0]-sn*s2*4,v[1],z0+sn*v[0]+c*s2*4];
+  return{x:x0+c*g.x,z:z0+sn*g.x,y:g.y,swing:g.swing,plant3:{lF:side(g.l,-1),rF:side(g.r,1)}}};
+// poses clave SOSTENIDAS (estilo FighterZ / animación limitada): sin interpolar; un solo cuadro intermedio al cambiar
+E.keyPose=function(t,keys,breakdown=true){let i=0;while(i+1<keys.length&&keys[i+1][0]<=t)i++;
+  if(breakdown&&i>0&&t-keys[i][0]<1/24*1.5)return E.lerpPose(keys[i-1][1],keys[i][1],.6);return keys[i][1]};
 E.facing3=ch=>{const fx=Math.cos(ch.yaw||0),fz=Math.sin(ch.yaw||0);return fx*Math.sin(C3.yaw)+fz*Math.cos(C3.yaw)};
 const hull=pts=>{const P=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]),cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]),lo=[],up=[];
   for(const p of P){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}
@@ -37,15 +48,15 @@ const hull=pts=>{const P=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]),cr=(o,a,b
 // así un brazo delante del torso se separa con línea, pero las articulaciones de un mismo miembro no se cortan.
 E.figure3=function(ch,mode='glow',inkCol,{mirror=false}={}){
   const def=E.scene.chars[ch.id],pal=def.pal,K=C3.K;
-  const p=E.to3(E.plantPose({pose:ch.pose}));
+  const p=E.pose3(ch);
   const W=q=>{const w=E.w3(ch,q);if(mirror)w[1]=-w[1];return w},Pj=q=>E.proj(...W(q));
   const add=(a,b2)=>[a[0]+b2[0],a[1]+b2[1],a[2]+b2[2]];
   const groups=[];
   const limbG=(pts,ws,col)=>{const pr=pts.map(Pj);groups.push({d:pr.reduce((s,q)=>s+q[3],0)/pr.length,parts:pr.slice(0,-1).map((a,i)=>({t:'limb',a,b:pr[i+1],wa:ws[i]*a[2]*K,wb:ws[i+1]*pr[i+1][2]*K,col}))})};
   // piernas: cadera lateral → rodilla → tobillo → bota
   for(const[s,K2,F,c]of[[-1,'lK','lF',pal.pantsD||pal.pants],[1,'rK','rF',pal.pants]]){
-    const hipS=add(p.hip,[0,0,s*5]),ank=add(p[F],[0,-8,0]),heel=add(p[F],[-3.5,-2.5,0]),toe=add(p[F],[9,-1.5,0]);
-    limbG([hipS,p[K2],ank],[12,9.5,7.5],c);
+    const hipS=add(p.hip,[0,-4,s*4.5]),ank=add(p[F],[0,-8,0]),heel=add(p[F],[-3.5,-2.5,0]),toe=add(p[F],[9,-1.5,0]);
+    limbG([hipS,p[K2],ank],[12,9.5,7.5],c);groups[groups.length-1].leg=1;groups[groups.length-1].knee=Pj(p[K2])[3];
     const pr=[heel,toe].map(Pj);groups[groups.length-1].parts.push({t:'limb',a:pr[0],b:pr[1],wa:6*pr[0][2]*K,wb:4.5*pr[1][2]*K,col:pal.boot||c});
   }
   // brazos: hombro → codo → puño
@@ -56,9 +67,11 @@ E.figure3=function(ch,mode='glow',inkCol,{mirror=false}={}){
   // cuerpo: torso como envolvente convexa de hombros, pecho, cintura y cadera
   {const c0=p.chest,h0=p.hip,m=[(c0[0]+h0[0])/2,(c0[1]+h0[1])/2,0];
     const tp=[add(c0,[0,1,10.5]),add(c0,[0,1,-10.5]),add(c0,[6.5,3,0]),add(c0,[-6,3,0]),add(c0,[0,-3,0]),
-      add(m,[0,0,7.5]),add(m,[0,0,-7.5]),add(m,[5.5,0,0]),add(m,[-5.5,0,0]),add(h0,[0,0,8.5]),add(h0,[0,0,-8.5]),add(h0,[6,0,0]),add(h0,[-6,0,0])].map(Pj);
-    const hd=Pj(p.head),nk=Pj(add(c0,[1,-2,0])),rH=8.5*hd[2]*K,parts=[{t:'poly',pts:hull(tp.map(q=>[q[0],q[1]])),col:pal.coat},
-      {t:'limb',a:nk,b:hd,wa:5.5*nk[2]*K,wb:5*hd[2]*K,col:pal.neck||pal.skin}];
+      add(m,[0,0,7.5]),add(m,[0,0,-7.5]),add(m,[5.5,0,0]),add(m,[-5.5,0,0]),add(h0,[0,0,8.5]),add(h0,[0,0,-8.5]),add(h0,[6,0,0]),add(h0,[-6,0,0]),add(h0,[0,5,9]),add(h0,[0,5,-9]),add(h0,[5.5,5,0]),add(h0,[-5.5,5,0]),
+      // faldón del abrigo: alarga el torso hasta medio muslo (más largo atrás); tapa la unión con las piernas
+      ...(def.skirt===false?[]:[add(h0,[-8,15,0]),add(h0,[4,11,0]),add(h0,[-2,13,9]),add(h0,[-2,13,-9])])].map(Pj);
+    const hd=Pj(p.head),nk=Pj(add(c0,[1,-5,0])),cl=Pj(add(c0,[0,-3,0])),rH=8.5*hd[2]*K,parts=[{t:'poly',pts:hull(tp.map(q=>[q[0],q[1]])),col:pal.coat},
+      {t:'limb',a:nk,b:hd,wa:7*nk[2]*K,wb:6.5*hd[2]*K,col:pal.neck||pal.skin},{t:'disc',a:cl,r:6.5*cl[2]*K,col:pal.coat}];
     const face=E.facing3(ch)*(mirror?1:1);
     if(def.head==='hood'&&!ch.hoodDown){const bk=Pj(add(p.head,[-15,-4,0]));parts.push({t:'limb',a:hd,b:bk,wa:9*hd[2]*K,wb:3*bk[2]*K,col:pal.hood},{t:'disc',a:hd,r:rH*1.22,col:pal.hood});
       if(face>-.35){const fc=Pj(add(p.head,[4,1.5,0]));parts.push({t:'disc',a:fc,r:5.2*fc[2]*K,col:pal.skin,face:1})}}
@@ -70,17 +83,50 @@ E.figure3=function(ch,mode='glow',inkCol,{mirror=false}={}){
   const cache=E.chainCache&&E.chainCache[ch.id];
   if(cache&&!mirror)for(const sp of def.chains||[]){if(sp.when&&!sp.when(ch))continue;const nodes=cache.chains[sp.key];if(!nodes)continue;
     const dx=ch.x-cache.x,dy=(ch.y||0)-cache.y,dz=(ch.z||0)-cache.z,pr=nodes.map(n=>E.proj(n.p[0]+dx,n.p[1]+dy,n.p[2]+dz)),n=pr.length-1;
-    groups.push({d:pr.reduce((s,q)=>s+q[3],0)/pr.length+(sp.key==='coat'||sp.key==='cape'?6:0),parts:pr.slice(0,-1).map((a,i)=>({t:'limb',a,b:pr[i+1],
+    groups.push({d:pr.reduce((s,q)=>s+q[3],0)/pr.length+(sp.key.startsWith('coat')||sp.key==='cape'?6:0),parts:pr.slice(0,-1).map((a,i)=>({t:'limb',a,b:pr[i+1],
       wa:lerp(sp.w[0],sp.w[1],i/n)*a[2]*K,wb:lerp(sp.w[0],sp.w[1],(i+1)/n)*pr[i+1][2]*K,col:sp.tipFrom!=null&&i>=sp.tipFrom?pal[sp.tip]:pal[sp.col]}))})}
+  const torso=groups.find(g=>g.eyes!==undefined);
+  for(const g of groups)if(g.leg&&torso&&g.knee>torso.d-14)g.d=Math.max(g.d,torso.d+1);
   groups.sort((a,b2)=>b2.d-a.d);
-  const out=mode==='ink'?inkCol:mode==='glow'?pal.aura:'#000',o=mode==='ink'?0:2;
+  const out=mode==='ink'?inkCol:mode==='glow'?pal.aura:'#000',ink=mode==='ink';
   const drawPart=(pt,extra,col)=>{if(pt.t==='limb')E.limb(pt.a,pt.b,pt.wa+extra,pt.wb+extra,col);else if(pt.t==='disc')E.disc(pt.a[0],pt.a[1],pt.r+extra/2,col);else E.poly(pt.pts,col)};
+  const Ls=lightScreen();
+  // 1) silueta exterior gruesa (todas las partes juntas) → 2) por grupo: línea interior fina + color + sombra cel
+  if(!ink)for(const g of groups)for(const pt of g.parts)if(!pt.face)drawPart(pt,3,out);
   for(const g of groups){
-    if(o)for(const pt of g.parts)if(!pt.face)drawPart(pt,o,out);
-    for(const pt of g.parts)drawPart(pt,0,mode==='ink'?inkCol:pt.col);
+    if(!ink)for(const pt of g.parts)if(!pt.face)drawPart(pt,1,'#0a0610');
+    for(const pt of g.parts){drawPart(pt,0,ink?inkCol:pt.col);if(!ink&&!mirror)celShade(pt,Ls)}
     if(g.eyes&&mode!=='ink')for(const e of g.eyes)E.R(e[0]-Math.max(1,e[2]*K),e[1],Math.max(1,Math.round(e[2]*K*1.6)),Math.max(1,Math.round(e[2]*K*.8)),mode==='glow'?pal.aura:'#fff');
   }
 };
+
+// ---------- sombreado cel ----------
+// luz principal en el mundo (arriba, a la derecha y hacia la cámara); se proyecta a pantalla según el giro de la cámara
+E.keyLight=[.55,-.75,.4];
+const shadeCache={};
+function darker(hex,f=.62){if(shadeCache[hex+f])return shadeCache[hex+f];const n=parseInt(hex.slice(1).padEnd(6,'0').slice(0,6),16);
+  const r=Math.round(((n>>16)&255)*f),g=Math.round(((n>>8)&255)*f),bl=Math.round((n&255)*f);return shadeCache[hex+f]='#'+((1<<24)|(r<<16)|(g<<8)|bl).toString(16).slice(1)}
+E.darker=darker;
+function lightScreen(){const[lx,ly,lz]=E.keyLight,cs=Math.cos(C3.yaw),sn=Math.sin(C3.yaw),x=lx*cs-lz*sn,d=Math.hypot(x,ly)||1;return[x/d,ly/d]}
+function celShade(pt,[lx,ly]){
+  if(pt.col===undefined||pt.face)return;const sh=darker(pt.col);
+  if(pt.t==='limb'){const dx=pt.b[0]-pt.a[0],dy=pt.b[1]-pt.a[1],d=Math.hypot(dx,dy)||1;let nx=-dy/d,ny=dx/d;if(nx*lx+ny*ly>0){nx=-nx;ny=-ny}
+    const oa=pt.wa*.22,ob=pt.wb*.22;E.limb([pt.a[0]+nx*oa,pt.a[1]+ny*oa],[pt.b[0]+nx*ob,pt.b[1]+ny*ob],pt.wa*.52,pt.wb*.52,sh)}
+  else if(pt.t==='disc'){const r=Math.round(pt.r),cx=Math.round(pt.a[0]),cy=Math.round(pt.a[1]),ox=cx+lx*r*.55,oy=cy+ly*r*.55,b=E.ctx();b.fillStyle=sh;
+    for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++){if(x*x+y*y>r*r+r*.8)continue;const qx=cx+x-ox,qy=cy+y-oy;if(qx*qx+qy*qy>r*r)b.fillRect(cx+x,cy+y,1,1)}}
+  else if(pt.t==='poly'){let y0=Infinity,y1=-Infinity;for(const q of pt.pts){y0=Math.min(y0,q[1]);y1=Math.max(y1,q[1])}const b=E.ctx(),n=pt.pts.length;b.fillStyle=sh;
+    for(let y=Math.floor(y0);y<=Math.ceil(y1);y++){const yc=y+.5,xs=[];for(let i=0;i<n;i++){const p=pt.pts[i],q=pt.pts[(i+1)%n];if((p[1]<=yc&&q[1]>yc)||(q[1]<=yc&&p[1]>yc))xs.push(p[0]+(yc-p[1])/(q[1]-p[1])*(q[0]-p[0]))}
+      if(xs.length<2)continue;xs.sort((a,c)=>a-c);const xa=Math.round(xs[0]),xb=Math.round(xs[xs.length-1]),w=xb-xa,sw=Math.round(w*.36);
+      if(sw>0)b.fillRect(lx>0?xa:xb-sw,y,sw,1)}}
+}
+// luz de la energía en 3D: tiñe con dither todo lo que está cerca de cada fuente (personajes, piso, sombras)
+E.lightPass=function(lights){const b=E.ctx(),img=b.getImageData(0,0,E.PW,E.PH),d=img.data,W=E.PW;
+  const Ls=lights.map(L=>{const pp=E.proj(L.x,L.y,L.z||0);return{px:pp[0],py:pp[1],r:L.r*pp[2]*C3.K,c:L.c,i:L.i}}).filter(L=>L.i>0&&L.r>1);if(!Ls.length)return;
+  for(const L of Ls){const x0=Math.max(0,Math.floor(L.px-L.r)),x1=Math.min(W-1,Math.ceil(L.px+L.r)),y0=Math.max(0,Math.floor(L.py-L.r)),y1=Math.min(E.PH-1,Math.ceil(L.py+L.r));
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const f=(1-Math.hypot(x-L.px,y-L.py)/L.r)*L.i;if(f<=0||BAYER[y&3][x&3]/16>=f)continue;const o=(y*W+x)*4;
+      d[o]=d[o]*.45+L.c[0]*.55;d[o+1]=d[o+1]*.45+L.c[1]*.55;d[o+2]=d[o+2]*.45+L.c[2]*.55}}
+  b.putImageData(img,0,0)};
+E.beam3=function(a,b2,w,col,lite){const pa=E.proj(...a),pb=E.proj(...b2);E.beam(pa,pb,w*(pa[2]+pb[2])/2*C3.K,col,lite)};
 
 // ---------- física 3D: mismas cadenas Verlet que el motor 2D, con profundidad ----------
 const SIM_STEPS=48,SIM_DT=1/60,GRAV=520;
@@ -90,7 +136,7 @@ E.simulate3=function(T){
     const tt=T-(SIM_STEPS-i)*SIM_DT,st=sc.state(wrap(tt)),wind=sc.wind?sc.wind(wrap(tt)):[0,0,0];
     for(const ch of st.chars||[]){const def=sc.chars[ch.id];if(!def||!def.chains)continue;
       const r=res[ch.id]||(res[ch.id]={chains:{}});r.x=ch.x;r.y=ch.y||0;r.z=ch.z||0;
-      const p=E.to3(ch.pose);
+      const p=E.pose3(ch);
       for(const sp of def.chains){const off=sp.off.length===3?sp.off:[sp.off[0],sp.off[1],0],q=p[sp.anchor],a=E.w3(ch,[q[0]+off[0],q[1]+off[1],q[2]+off[2]]);
         const key=ch.id+sp.key,pa=prevA[key];let nodes=r.chains[sp.key];
         if(!nodes||!pa||Math.hypot(a[0]-pa[0],a[1]-pa[1],a[2]-pa[2])>70){nodes=[];const bx=-Math.cos(ch.yaw||0),bz=-Math.sin(ch.yaw||0);

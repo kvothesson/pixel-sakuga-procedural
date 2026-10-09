@@ -289,3 +289,29 @@ El salto de paradigma recomendado en la sección 13. El mismo pixel art, pero ah
   - *Salir o hundirse en el charco:* recortar el dibujo en la línea del piso (`clip`) y agregar ondas en la base.
 - **Lección de cámara:** con `pitch` 0 y los personajes casi en fila, la profundidad no se nota. Un `pitch` de 0,15 a 0,25 (mirar un poco hacia abajo) muestra el piso y las distancias.
 - **Laboratorio 3D:** `escenas/lab3d/` muestra un giro de 360°, una órbita alrededor de un golpe y un puño a cámara, sobre fondo claro.
+
+---
+
+## 15. Ep. 8 — juntas, técnicas estilo FighterZ y composición en profundidad
+
+### Juntas (feedback: "las juntas se ven raras")
+- **Caderas:** el muslo no puede empezar como una bola que asome por debajo del torso. Ahora nace adentro de una **pelvis ancha** (puntos extra en la envolvente) y las piernas se dibujan **detrás del torso**, salvo que la rodilla venga claramente hacia la cámara (una patada al frente).
+- **Cuello:** corto y ancho, con un **cuello de abrigo** (disco del color del torso) que tapa la unión. Se aplica en 2D y en 3D.
+- **Faldón:** en 3D las solapas sueltas se leen como piernas extra. El abrigo largo pasa a ser parte del torso (puntos de faldón en la envolvente, más largo atrás) y tapa la unión con las piernas.
+
+### Lo que tomamos de Dragon Ball FighterZ (modelos 3D que se ven 2D)
+- **Sombreado cel de dos tonos** (`celShade`): una luz principal en el mundo (`E.keyLight`) se proyecta a pantalla según el giro de la cámara.
+  - *Miembros:* banda oscura del lado opuesto a la luz.
+  - *Cabeza y puños:* medialuna de sombra.
+  - *Torso:* franja vertical de sombra.
+  - El color de sombra se deriva solo (`darker`).
+- **Contorno de grosor variable:** primero la silueta exterior de todo el personaje (gruesa, en el color del aura) y después, por grupo, una línea interior fina oscura. Separa las partes sin ensuciarlas.
+- **Poses clave sostenidas** (`keyPose(t, [[t0,pose],[t1,pose],…])`): sin interpolación, la pose queda quieta hasta la siguiente clave, con **un solo cuadro intermedio** al 60 % al cambiar. Es lo que le da el golpe "a mano" a FighterZ.
+- **Cambio de orientación en seco:** el personaje gira hacia su blanco en el cuadro de anticipación, sin rotación animada.
+
+### 3D: luz, pies y composición
+- `lightPass(luces)` tiñe con dither todo el buffer cerca de cada fuente (personajes, piso, sombras), con radio en unidades de mundo y perspectiva.
+- `gait3` y `pose3`: la marcha procedural en cualquier dirección del piso, con pies clavados por IK (`ch.plant3`).
+- **Reflejos antes que los personajes:** si se dibujan después, el reflejo de uno más lejano tapa los pies de uno más cercano.
+- **Composición con muchos personajes:** con la cámara a la altura de los ojos, un anillo de 9 figuras se amontona en una franja. Con un **plano casi cenital** (`pitch` ≈ 0,9) el anillo se lee como anillo, y para el remate se baja la cámara (`pitch` 0,25) y se acerca.
+- **Loop con cámara orbitando:** si la cámara da exactamente una vuelta por loop (`yaw = yaw0 + 2π·t/LOOP`) y el primer y el último segmento tienen el mismo contenido, la órbita también cierra.
