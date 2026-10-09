@@ -1,0 +1,136 @@
+# Pixel Sakuga Procedural — guía reutilizable
+
+Técnica para hacer escenas de acción con dirección de anime (sakuga) en **pixel art generado por código**, en una sola página HTML con canvas. Salió de iterar tres versiones (neón, siluetas vectoriales y pixel art) y de un intento fallido con sprites dibujados a mano.
+
+**Idea central:** el código no compite con un estudio en *dibujo*, pero sí puede competir en *ritmo, timing y efectos*. Hay que elegir un estilo donde la simplicidad sea estética (pixel art) y poner todo el esfuerzo en la dirección.
+
+---
+
+## 1. Qué funcionó y qué no
+
+| Funcionó | No funcionó |
+|---|---|
+| Personajes como **esqueleto de poses** (11 articulaciones) pixelado en cada frame | **Sprites ASCII dibujados a mano**: proporciones raras, no se leen como personajes |
+| Pixel art a baja resolución: lo tosco se lee como intencional | Vector o canvas con antialias: se nota que es "dibujo de código" |
+| Siluetas con un **rasgo distintivo** (capucha; coleta + bufanda) | Pelo en punta: parecía una mano abierta y se acercaba a un personaje conocido |
+| Contorno + **1 px de luz del lado de la fuente** (luna) | Contorno parejo: el personaje queda plano |
+| Puños grandes (disco en cada mano) | Manos del grosor del brazo: no se lee quién pega |
+| Primeros planos de **ojos** con sprite chico escalado | Rostros en plano general: con pocos píxeles se pierden |
+
+**Bug a evitar:** no dibujar líneas de 1 px dentro del cuerpo (por ejemplo, una línea de brillo del pecho a la cadera). Se leen como **líneas guía del esqueleto**. Si hace falta brillo, que sea en el borde (rim light), nunca en el medio.
+
+---
+
+## 2. Pipeline técnico
+
+1. **Buffer de baja resolución:** se dibuja en un canvas offscreen de unos 150 px en su lado corto.
+   - `PX = max(1, round(min(Wd,Hd)/150))`, `PW = ceil(Wd/PX)`, `PH = ceil(Hd/PX)` (Wd y Hd en píxeles de dispositivo).
+   - Se escala al canvas real con `imageSmoothingEnabled=false` y un factor **entero**. CSS: `image-rendering: pixelated`.
+2. **Solo primitivas pixel**, sin `arc` ni gradientes del canvas (generan antialias):
+   - `R(x,y,w,h,c)`: `fillRect` con coordenadas redondeadas.
+   - `line()`: Bresenham con pincel cuadrado de ancho `w` (sirve para extremidades, rayos y líneas de foco).
+   - `disc()`: círculo relleno por filas (cabezas, puños, luna, núcleo de energía).
+   - `ring()`: elipse punteada (ondas expansivas).
+   - **Dither Bayer 4×4** (`ditherDisc`, `ditherFill`) en lugar de alpha: auras, halos, humo, flashes y fundidos.
+   - `pixText()`: renderiza el texto en un canvas aparte, umbraliza el alpha (>110) y lo pinta píxel por píxel. Sirve para kanjis en los impact frames y sellos.
+3. **Cámara manual:** `toPx(wx,wy) = [cx + (wx-camX)*k, cy + (wy-camY)*k]` con `k = zoom*u` y `u = PH/420` (o `PW/220` en vertical). El zoom cambia cuántos píxeles mide cada unidad, pero todo se sigue dibujando en la grilla, así que nunca se pierde la nitidez.
+   - El shake se aplica en **píxeles enteros**, sorteado a 24 fps con un hash.
+4. **Determinismo:** todo lo aleatorio sale de `hash(n)` (seno fractal), nada de `Math.random()` por frame. Así cualquier `t` se puede reproducir, pausar o adelantar (`window.__seek(t)` para testear).
+5. **Tipografía:** *DotGothic16* (Google Fonts) cubre el japonés y el latín en estilo pixel. Se usa para subtítulos (DOM), UI y `pixText`.
+
+---
+
+## 3. Personajes
+
+- **Esqueleto:** `hip, chest, head, lE, lH, rE, rH, lK, lF, rK, rF` en unidades de mundo (unos 95 de alto), mirando a la derecha, con y negativo hacia arriba.
+- **Poses base:** `stance`, `stance2` (respiración), `crouch` (anticipación), `dash`, `strike`, `after` (remate agachado). Se interpolan con `lerpPose`.
+- **Transformación:** `dir` (±1 para espejar), `rot` (pivote en los pies, para caídas o ataques en picada), `x` e `y`.
+- **Capas de dibujo**, en orden:
+  1. Contorno: todo con grosor +2, en negro o en el color del aura si está "encendido".
+  2. Rim light: todo con grosor 0, en el color de la luz, desplazado 1 px hacia la fuente.
+  3. Cuerpo: colores reales (abrigo, pantalón, piel, guantes, rasgo distintivo).
+  4. Detalle: un píxel de ojo brillante.
+- **Modo `ink`:** el cuerpo entero en un solo color. Sirve para impact frames e imágenes fantasma.
+- **Rasgos que leen bien a baja resolución:** capucha (disco grande y punta hacia atrás), coleta o bufanda (cadena de segmentos con onda senoidal). Un personaje = una silueta reconocible.
+
+---
+
+## 4. Dirección (lo que da la sensación de sakuga)
+
+### Timing mixto
+- **Respiración en threes (8 fps):** `floor(t*8)/8`.
+- **Movimiento en twos (12 fps):** posiciones y poses con `floor(t*12)/12`.
+- **Efectos en ones (24 fps):** rayos, impact frames y líneas de foco.
+- La cámara puede ir fluida o a 24.
+
+### Recursos, en orden de impacto
+1. **Anticipación:** 3 o 4 cuadros agachado antes de salir. Sin eso, el golpe no pesa.
+2. **Hit-stop:** congelar el mundo entero 0,1 a 0,15 s en el contacto (fijar `t` mientras se dibuja), **en silencio**.
+3. **Impact frames:** 0,4 a 0,6 s alternando fondo blanco con tinta negra, fondo negro con tinta blanca y fondo rojo con tinta negra, cada 2 cuadros a 24 fps. Llevan líneas de foco, siluetas en `ink`, un estallido invertido y un kanji gigante (衝).
+4. **Líneas de foco (集中線):** líneas radiales desde los bordes hasta un radio interior aleatorio.
+5. **Speed lines** horizontales durante la embestida.
+6. **Imágenes fantasma:** 3 copias en `ink` con el color del aura, cada vez más oscuras, en las posiciones de los cuadros anteriores.
+7. **Corte de plano:** dentro de una cámara lenta larga, a mitad, cortar a otro encuadre (los pies que quiebran el piso).
+8. **Pausa antes de la reacción:** el golpeado se queda quieto con el tajo y recién después cae.
+9. **Flash:** `ditherFill` blanco que sube y después baja con el corte.
+10. **Letterbox** de 7,5 % arriba y abajo, y fundido con dither.
+
+### Plantilla de timeline (duelo, unos 10 s)
+```
+0.0  carga (auras, brasas, zoom lento)        "—Frase corta."
+2.0  anticipación (crouch)
+2.35 embestida (easeIn, fantasmas, speed lines)
+2.9  hit-stop (silencio)
+3.05 impact frames
+3.6  choque en cámara lenta (rayos, ondas, escombros, grietas)
+4.6  corte a los pies
+5.0  vuelta al choque, flash creciente
+5.9  remate: pasaron de largo, de espaldas         "—…Demasiado lento."
+6.5  tajo · pausa · 7.25 caída
+7.9  primer plano de ojos + sello 決着
+9.5  fundido
+```
+
+---
+
+## 5. Sonido (Web Audio, sin archivos)
+
+Se activa con un botón, porque los navegadores exigen un gesto del usuario. Pasa por un compresor antes de la salida.
+
+| Efecto | Receta |
+|---|---|
+| Zumbido de energía | 3 sierras (55, 55,6 y 82,4 Hz) → lowpass a 320 Hz → ganancia por fase (`setTargetAtTime`) |
+| Inhalar / subida | Ruido bandpass o highpass con barrido ascendente y ganancia que **crece** |
+| Whoosh | Ruido bandpass de 2200 a 280 Hz en 0,5 s |
+| BOOM | Seno de 150 a 32 Hz + ruido lowpass de 5000 a 180 Hz + cuadrada corta grave |
+| Chisporroteo | Ráfagas de ruido highpass de 50 ms, sorteadas con hash en cada frame a 24 fps |
+| Tajo metálico | Dos triángulos agudos levemente desafinados (2400 y 3150 Hz) + ruido highpass muy corto |
+| Caída / sello | Seno grave corto (115 a 45 Hz), más un bandpass corto para el "toc" |
+| Lluvia | Ruido en loop → highpass a 1200 Hz → lowpass a 7000 Hz, ganancia baja constante |
+
+- **El silencio es un efecto:** cortar el zumbido a 0 en el hit-stop (constante de tiempo de 8 ms) hace que el BOOM pegue el doble.
+- Los eventos se disparan cuando `t` cruza su marca entre un frame y el siguiente, contemplando el salto del loop.
+
+---
+
+## 6. Loops que enganchan (shorts)
+
+- **Gancho en el primer segundo:** arrancar con algo que ya está pasando (ojos que se abren con brillo y un sonido) y, si suma, un texto corto ("NO PARPADEES").
+- **Loop perfecto:** que el último cuadro sea igual al primero. Funciona muy bien cerrar en los ojos que se cierran y abrir con los ojos que se abren.
+- **Narrativa circular:** una frase que haga que el loop tenga sentido ("—Otra vez."). Así el espectador siente que la escena se repite a propósito.
+- **Formato vertical 9:16:** acción en el eje vertical (ataque que cae desde arriba). Personaje grande, con unas 220 unidades de ancho visibles.
+- **Duración:** de 7 a 9 s, para que el loop se vea varias veces.
+
+---
+
+## 7. Checklist antes de publicar
+
+- [ ] Sin antialias: solo `fillRect`, ni `arc` ni `ctx.scale` en el buffer.
+- [ ] Sin líneas internas tipo esqueleto.
+- [ ] Cada personaje se reconoce en silueta y no se parece a uno con copyright.
+- [ ] La anticipación, el hit-stop y la pausa antes de la reacción están.
+- [ ] Los impact frames van a 24 fps; el movimiento, a 12.
+- [ ] Hay silencio en el hit-stop.
+- [ ] Funciona a 400 px de ancho; el stage tiene el aspecto correcto (16:9, 4:5 o 9:16).
+- [ ] `prefers-reduced-motion` arranca en pausa en un frame lindo.
+- [ ] Revisión visual con capturas en momentos clave vía `__seek(t)`.

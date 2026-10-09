@@ -1,0 +1,28 @@
+# Pixel Sakuga Procedural
+
+Escenas de acción con dirección de anime (sakuga) en pixel art generado por código. Cada escena es una página HTML autocontenida con canvas, sin build ni dependencias.
+
+## Antes de tocar nada
+- Leer `guia/pixel-sakuga-procedural.md`: ahí está todo lo que funciona, lo que no y por qué. Es la fuente de verdad de la técnica.
+- Cada aprendizaje nuevo (algo que funcionó, algo que falló, un bug visual) se agrega a la guía **en el mismo commit** que el cambio.
+
+## Reglas firmes
+- Personajes = esqueleto de poses pixelado por código. **No usar sprites dibujados a mano en ASCII**: se probó y no funcionó.
+- Nada de líneas internas de 1 px dentro del cuerpo: se leen como líneas guía del esqueleto.
+- Solo primitivas pixel (`fillRect`, Bresenham, discos por filas, dither Bayer) sobre un buffer de baja resolución escalado con factor entero. Sin `arc`, gradientes ni antialias en el buffer.
+- Todo lo aleatorio sale de `hash(n)`, así cualquier instante es reproducible con `window.__seek(t)`.
+- Personajes originales. Nada que se parezca a uno con copyright (cuidado con el pelo blanco en punta).
+- Regla 1 + 1: cada escena nueva estrena una técnica y un gancho para el espectador.
+
+## Estructura
+- `guia/`: la guía viva de la técnica.
+- `escenas/<nombre>/index.html`: una escena por carpeta, abrible directo en el navegador o con GitHub Pages.
+- `escenas/archivo/`: versiones anteriores, como historial del estilo.
+
+## Cómo verificar una escena
+Abrirla con Playwright, pausar, llamar `window.__seek(t)` en 6 a 12 momentos clave, sacar capturas y armar una grilla para revisarla de un vistazo. Una sola pasada de correcciones por revisión.
+
+## Próximos pasos
+1. Extraer el motor compartido a `engine/` (primitivas, cámara, rig, efectos, sonido) para que cada escena sea solo un timeline de datos.
+2. Física secundaria (Verlet) para pelo, bufanda y abrigo.
+3. "Otra Vez · Ep. 2" sobre el motor nuevo.

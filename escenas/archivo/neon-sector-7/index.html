@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0}</style>
+<title>Neón Sector 7</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Share+Tech+Mono&display=swap">
+<style>
+/* Layout: una sola pantalla de cine, HUD encima, controles mínimos abajo. Look nocturno fijo (single-theme a propósito). */
+:root{
+  --night:#07040f;
+  --ink:#e9e4ff;
+  --dim:#8f86b8;
+  --pink:#ff3fa4;
+  --cyan:#3ff2ff;
+  --amber:#ffb84a;
+  --f-display:"Dela Gothic One","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --f-mono:"Share Tech Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--ink)}
+body{font-family:var(--f-mono);padding-inline:16px;padding-block:20px 28px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.stage{position:relative;width:100%;max-width:1100px;aspect-ratio:16/9;max-height:80vh;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px #2a1a4a,0 20px 60px -20px #ff3fa455}
+@media (max-width:640px){.stage{aspect-ratio:4/5}}
+canvas{display:block;width:100%;height:100%}
+.hud{position:absolute;inset:0;pointer-events:none;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;
+  background:repeating-linear-gradient(0deg,#0000 0 2px,#00000022 2px 3px),radial-gradient(ellipse at center,#0000 55%,#000a 100%)}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;font-size:12px;letter-spacing:.12em;color:var(--cyan);text-shadow:0 0 6px #3ff2ff88}
+.top .zone b{display:block;font-family:var(--f-display);font-weight:400;font-size:clamp(18px,3.4vw,30px);letter-spacing:.04em;color:var(--ink);text-shadow:0 0 10px var(--pink),0 0 2px #fff}
+.top .clock{text-align:right;color:var(--amber);text-shadow:0 0 6px #ffb84a88}
+.sub{align-self:center;max-width:90%;text-align:center;font-family:var(--f-mono);font-size:clamp(14px,2.2vw,20px);color:#fff;
+  text-shadow:0 0 4px #000,2px 2px 0 #000,-1px -1px 0 #000;min-height:1.4em;transition:opacity .4s}
+.sub small{display:block;font-size:.7em;color:#ffd6ec;letter-spacing:.1em}
+.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;color:var(--dim);font-size:13px}
+button{font:inherit;color:var(--ink);background:#1a0f30;border:1px solid #4a2f7a;border-radius:4px;padding:8px 14px;cursor:pointer;letter-spacing:.08em}
+button:hover{border-color:var(--pink);color:#fff}
+button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+
+<div class="stage" id="stage">
+  <canvas id="c" aria-label="Animación: una motociclista cruza de noche una ciudad cyberpunk de neón bajo la lluvia"></canvas>
+  <div class="hud">
+    <div class="top">
+      <div class="zone">第七区 · SECTOR 7<b>ネオン夜行</b></div>
+      <div class="clock" id="clock">--:--:--<br>雨 · 98% HUM</div>
+    </div>
+    <div class="sub" id="sub"></div>
+  </div>
+</div>
+<div class="controls">
+  <button id="toggle" type="button">❚❚ PAUSA</button>
+  <span>Tocá la escena para pausar</span>
+</div>
+
+<script>
+(()=>{
+const cv=document.getElementById('c'),ctx=cv.getContext('2d'),stage=document.getElementById('stage');
+let W=0,H=0,dpr=1,GY=0,S=1,layers=[],drops=[],streaks=[],cars=[],t=0,last=0,running=true;
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const WORDS=['電脳','ラーメン','夜市','義体','バー','雨','無限','薬','ホテル','月光','回路','龍'];
+const NEON=['#ff3fa4','#3ff2ff','#ffb84a','#b06bff','#5bff9e'];
+
+function buildLayer(seed,color,hMin,hMax,speed,wMin,wMax,withSigns,winA){
+  const r=mulberry(seed);
+  const tileW=Math.ceil(Math.max(W*1.8,1000));
+  const off=document.createElement('canvas');off.width=tileW*dpr;off.height=H*dpr;
+  const o=off.getContext('2d');o.scale(dpr,dpr);
+  const signs=[];let x=0;
+  while(x<tileW){
+    let w=(wMin+r()*(wMax-wMin))*S; if(tileW-x<w*1.4) w=tileW-x;
+    const h=(hMin+r()*(hMax-hMin))*H, top=GY-h;
+    o.fillStyle=color;o.fillRect(x,top,w+1,h);
+    // rim light
+    o.fillStyle='rgba(255,63,164,.12)';o.fillRect(x,top,2,h);
+    if(r()<.35){o.fillRect(x+w*.5,top-18*S,2*S,18*S);o.fillStyle='#ff3b3b';o.fillRect(x+w*.5-1,top-20*S,4*S,3*S)}
+    // windows
+    const cw=6*S,ch=8*S,gx=5*S,gy=7*S;
+    for(let wy=top+10*S;wy<GY-12*S;wy+=ch+gy)for(let wx=x+6*S;wx<x+w-cw-4*S;wx+=cw+gx){
+      if(r()<.28){o.fillStyle=r()<.7?`rgba(255,200,120,${winA})`:`rgba(63,242,255,${winA})`;o.fillRect(wx,wy,cw,ch)}
+    }
+    if(withSigns&&w>40*S&&r()<.75){
+      const word=WORDS[Math.floor(r()*WORDS.length)];
+      signs.push({x:x+w*(.2+r()*.5),y:top+20*S+r()*Math.min(h*.4,120*S),word,col:NEON[Math.floor(r()*NEON.length)],seed:r()*100,bad:r()<.25});
+    }
+    x+=w;
+  }
+  return{off,tileW,speed,signs};
+}
+
+function resize(){
+  const b=stage.getBoundingClientRect();dpr=Math.min(devicePixelRatio||1,2);
+  W=b.width;H=b.height;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  GY=H*.72;S=Math.max(.6,Math.min(H/450,1.6));
+  layers=[
+    buildLayer(7,'#2a1652',.30,.62,14,50,130,false,.35),
+    buildLayer(21,'#170b30',.25,.58,45,40,110,true,.55),
+    buildLayer(99,'#0b0619',.18,.48,150,60,150,true,.75)
+  ];
+  drops=Array.from({length:Math.round(W*H/2600)},()=>({x:Math.random()*W,y:Math.random()*H,l:8+Math.random()*16,v:500+Math.random()*400}));
+  streaks=Array.from({length:14},()=>({x:Math.random()*W,y:GY*.3+Math.random()*H*.6,l:60+Math.random()*180,v:900+Math.random()*900}));
+  cars=Array.from({length:5},(_,i)=>({x:Math.random()*W,y:H*(.12+Math.random()*.25),v:(20+Math.random()*50)*(i%2?1:-1),c:NEON[i%NEON.length]}));
+  if(!running)frame(0);
+}
+
+function sky(){
+  const g=ctx.createLinearGradient(0,0,0,GY);
+  g.addColorStop(0,'#0a0420');g.addColorStop(.55,'#3a0f55');g.addColorStop(1,'#8a1f6a');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,GY);
+  // luna
+  const mx=W*.72,my=H*.24,mr=Math.min(W,H)*.13;
+  const h=ctx.createRadialGradient(mx,my,mr*.6,mx,my,mr*3);h.addColorStop(0,'rgba(255,190,230,.35)');h.addColorStop(1,'rgba(255,190,230,0)');
+  ctx.fillStyle=h;ctx.fillRect(0,0,W,GY);
+  ctx.fillStyle='#ffe3f2';ctx.beginPath();ctx.arc(mx,my,mr,0,7);ctx.fill();
+  ctx.fillStyle='rgba(58,15,85,.5)';
+  for(let i=0;i<4;i++)ctx.fillRect(mx-mr,my+mr*(.15+i*.2),mr*2,mr*.05*(i+1));
+  // autos voladores
+  for(const c of cars){
+    ctx.fillStyle=c.c;ctx.shadowColor=c.c;ctx.shadowBlur=8;ctx.fillRect(c.x,c.y,6*S,2*S);
+    ctx.fillStyle='rgba(255,255,255,.8)';ctx.fillRect(c.x+(c.v>0?6*S:-2*S),c.y,2*S,2*S);ctx.shadowBlur=0;
+  }
+}
+
+function drawLayer(L,i){
+  const o=(t*L.speed)%L.tileW;
+  for(let k=-1;k<2;k++){
+    const x=k*L.tileW-o;if(x>W||x+L.tileW<0)continue;
+    ctx.drawImage(L.off,x,0,L.tileW,H);
+    for(const s of L.signs){
+      const sx=x+s.x;if(sx<-60||sx>W+60)continue;
+      let on=1;if(s.bad){const f=Math.sin(t*23+s.seed)*Math.sin(t*7.3+s.seed*2);on=f>.15?1:.15}
+      const fs=(i===2?17:12)*S,chars=[...s.word],bw=fs*1.5,bh=chars.length*fs*1.15+fs*.6;
+      ctx.globalAlpha=.4+.6*on;
+      ctx.fillStyle='rgba(10,4,20,.85)';ctx.fillRect(sx-bw/2,s.y,bw,bh);
+      ctx.strokeStyle=s.col;ctx.lineWidth=1.5;ctx.shadowColor=s.col;ctx.shadowBlur=14*on;
+      ctx.strokeRect(sx-bw/2,s.y,bw,bh);
+      ctx.fillStyle=on>.5?'#fff':s.col;ctx.font=`${fs}px ${getComputedStyle(document.documentElement).getPropertyValue('--f-display')}`;
+      ctx.textAlign='center';ctx.textBaseline='top';
+      chars.forEach((c,j)=>ctx.fillText(c,sx,s.y+fs*.35+j*fs*1.15));
+      ctx.shadowBlur=0;
+      if(i===2){ // reflejo en el asfalto mojado
+        const rg=ctx.createLinearGradient(0,GY,0,H);rg.addColorStop(0,s.col+'55');rg.addColorStop(1,s.col+'00');
+        ctx.fillStyle=rg;ctx.fillRect(sx-bw*.35+Math.sin(t*6+s.seed)*2,GY,bw*.7,H-GY);
+      }
+      ctx.globalAlpha=1;
+    }
+  }
+}
+
+function road(){
+  const g=ctx.createLinearGradient(0,GY,0,H);g.addColorStop(0,'#1a0b2a');g.addColorStop(1,'#05020a');
+  ctx.fillStyle=g;ctx.fillRect(0,GY,W,H-GY);
+  ctx.fillStyle='#ff3fa4';ctx.globalAlpha=.6;ctx.fillRect(0,GY,W,1.5);ctx.globalAlpha=1;
+  const ly=GY+(H-GY)*.62,dash=60*S,gap=50*S,o=(t*900)%(dash+gap);
+  ctx.fillStyle='rgba(233,228,255,.55)';
+  for(let x=-o;x<W;x+=dash+gap)ctx.fillRect(x,ly,dash,3*S);
+}
+
+function bike(){
+  const bx=W*(W<500?.45:.4)+Math.sin(t*.7)*W*.02,by=GY+(H-GY)*.42+Math.sin(t*14)*1.2;
+  // estela de luz
+  for(const [dy,col,lw] of [[-12,'#ff3fa4',4],[-8,'#3ff2ff',2]]){
+    const tx=bx-46*S,ty=by+dy*S;
+    const g=ctx.createLinearGradient(tx,0,tx-W*.55,0);g.addColorStop(0,col);g.addColorStop(1,col+'00');
+    ctx.strokeStyle=g;ctx.lineWidth=lw*S;ctx.shadowColor=col;ctx.shadowBlur=12;
+    ctx.beginPath();ctx.moveTo(tx,ty);
+    for(let k=1;k<=20;k++){const px=tx-k*W*.0275;ctx.lineTo(px,ty+Math.sin(t*3-k*.4)*k*.35*S)}
+    ctx.stroke();
+  }
+  ctx.shadowBlur=0;
+  ctx.save();ctx.translate(bx,by);ctx.scale(S,S);
+  // haz delantero
+  const hb=ctx.createLinearGradient(52,0,260,0);hb.addColorStop(0,'rgba(220,250,255,.45)');hb.addColorStop(1,'rgba(220,250,255,0)');
+  ctx.fillStyle=hb;ctx.beginPath();ctx.moveTo(52,-14);ctx.lineTo(260,-40);ctx.lineTo(260,22);ctx.closePath();ctx.fill();
+  // ruedas
+  for(const wx of[-38,40]){
+    ctx.fillStyle='#05020a';ctx.beginPath();ctx.arc(wx,0,14,0,7);ctx.fill();
+    ctx.strokeStyle='#3ff2ff';ctx.lineWidth=2.5;ctx.shadowColor='#3ff2ff';ctx.shadowBlur=10;
+    ctx.beginPath();ctx.arc(wx,0,10,t*20,t*20+4.6);ctx.stroke();ctx.shadowBlur=0;
+  }
+  // carenado
+  ctx.fillStyle='#e9f7ff';ctx.beginPath();
+  ctx.moveTo(-48,-10);ctx.lineTo(-22,-26);ctx.lineTo(18,-30);ctx.lineTo(44,-20);ctx.lineTo(56,-9);ctx.lineTo(34,-4);ctx.lineTo(-30,-4);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#3ff2ff';ctx.fillRect(-20,-18,46,3);
+  ctx.fillStyle='#1a0b2a';ctx.beginPath();ctx.moveTo(-4,-28);ctx.lineTo(22,-30);ctx.lineTo(36,-24);ctx.lineTo(8,-22);ctx.closePath();ctx.fill();
+  // luces
+  ctx.shadowBlur=16;ctx.shadowColor='#ff2050';ctx.fillStyle='#ff2050';ctx.fillRect(-50,-14,6,4);
+  ctx.shadowColor='#dff';ctx.fillStyle='#fff';ctx.fillRect(52,-16,5,4);ctx.shadowBlur=0;
+  // bufanda
+  ctx.strokeStyle='#ff3fa4';ctx.lineWidth=5;ctx.lineCap='round';ctx.shadowColor='#ff3fa4';ctx.shadowBlur=8;
+  ctx.beginPath();ctx.moveTo(14,-48);
+  for(let k=1;k<=8;k++)ctx.lineTo(14-k*10,-48+Math.sin(t*12-k*.9)*k*1.1-k*.6);
+  ctx.stroke();ctx.shadowBlur=0;
+  // piloto
+  ctx.strokeStyle='#0d0618';ctx.lineWidth=8;ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.beginPath();ctx.moveTo(-10,-30);ctx.lineTo(14,-46);ctx.stroke();
+  ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(12,-44);ctx.lineTo(30,-36);ctx.lineTo(38,-28);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-8,-30);ctx.lineTo(6,-18);ctx.lineTo(-4,-10);ctx.stroke();
+  ctx.strokeStyle='rgba(255,63,164,.8)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(-10,-34);ctx.lineTo(14,-50);ctx.stroke();
+  // casco
+  ctx.fillStyle='#0d0618';ctx.beginPath();ctx.arc(22,-53,8.5,0,7);ctx.fill();
+  ctx.fillStyle='#3ff2ff';ctx.shadowColor='#3ff2ff';ctx.shadowBlur=8;ctx.fillRect(23,-56,8,3);ctx.shadowBlur=0;
+  ctx.restore();
+}
+
+function weather(dt){
+  ctx.strokeStyle='rgba(200,210,255,.35)';ctx.lineWidth=1;ctx.beginPath();
+  for(const d of drops){
+    d.y+=d.v*dt;d.x-=d.v*.25*dt;if(d.y>H){d.y=-20;d.x=Math.random()*W*1.2}
+    ctx.moveTo(d.x,d.y);ctx.lineTo(d.x-d.l*.25,d.y+d.l);
+  }
+  ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,.18)';ctx.beginPath();
+  for(const s of streaks){
+    s.x-=s.v*dt;if(s.x+s.l<0){s.x=W+Math.random()*200;s.y=GY*.3+Math.random()*H*.6}
+    ctx.moveTo(s.x,s.y);ctx.lineTo(s.x+s.l,s.y);
+  }
+  ctx.stroke();
+}
+
+function frame(dt){
+  for(const c of cars){c.x+=c.v*dt;if(c.x>W+20)c.x=-20;if(c.x<-20)c.x=W+20}
+  sky();layers.forEach(drawLayer);road();bike();weather(dt);
+  // relámpago ocasional de neón
+  const flash=Math.max(0,Math.sin(t*.9)*Math.sin(t*3.1)-.92)*6;
+  if(flash>0){ctx.fillStyle=`rgba(180,120,255,${flash*.25})`;ctx.fillRect(0,0,W,H)}
+}
+
+function loop(now){
+  const dt=Math.min(.05,(now-(last||now))/1000);last=now;
+  if(running){t+=dt;frame(dt)}
+  requestAnimationFrame(loop);
+}
+
+// subtítulos estilo fansub
+const lines=[['—La ciudad nunca duerme.','街は眠らない'],['—Y yo tampoco.','私もだ'],['—Tres cuadras más y salimos del radar.','あと三区画'],['—Agarrate fuerte.','しっかり掴まって']];
+const sub=document.getElementById('sub');let li=0;
+function nextLine(){sub.style.opacity=0;setTimeout(()=>{const[a,b]=lines[li++%lines.length];sub.innerHTML=`${a}<small>${b}</small>`;sub.style.opacity=1},400)}
+nextLine();setInterval(()=>{if(running)nextLine()},3800);
+
+const clock=document.getElementById('clock');
+setInterval(()=>{const d=new Date();clock.innerHTML=`${d.toLocaleTimeString('es-AR',{hour12:false})}<br>雨 · 98% HUM`},1000);
+
+const btn=document.getElementById('toggle');
+function setRun(v){running=v;btn.textContent=v?'❚❚ PAUSA':'▶ PLAY';last=0}
+btn.onclick=()=>setRun(!running);
+stage.onclick=()=>setRun(!running);
+
+new ResizeObserver(resize).observe(stage);
+document.fonts&&document.fonts.ready.then(()=>{if(!running)frame(0)});
+resize();
+if(reduce){setRun(false);frame(0)}
+requestAnimationFrame(loop);
+})();
+</script>
