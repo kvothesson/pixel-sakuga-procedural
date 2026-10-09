@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Otra Vez · Ep. 3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* Layout: short vertical 9:16 centrado, gancho arriba, subtítulos abajo, controles debajo. Look nocturno fijo (single-theme a propósito). */
+:root{
+  --night:#07050d;
+  --ink:#ece8f6;
+  --dim:#8a83a6;
+  --blue:#4fb4ff;
+  --red:#ff2e45;
+  --green:#5bff9e;
+  --f-pixel:"DotGothic16","MS Gothic",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--ink);margin:0}
+body{font-family:var(--f-pixel);padding-inline:16px;padding-block:16px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.stage{position:relative;width:min(100%,calc(82vh * 9 / 16));aspect-ratio:9/16;max-width:100%;overflow:hidden;background:#000;cursor:pointer;border-radius:10px;box-shadow:0 0 0 2px #10261c}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.hook{position:absolute;top:44%;left:0;right:0;text-align:center;pointer-events:none;font-size:clamp(18px,6vw,30px);letter-spacing:.06em;color:#fff;
+  text-shadow:3px 0 #0f6a3a,-3px 0 #000,0 3px #000,0 -3px #000}
+.hook small{display:block;font-size:.5em;color:#ffd84a;letter-spacing:.2em;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000}
+.sub{position:absolute;left:50%;bottom:17%;transform:translateX(-50%);width:92%;text-align:center;pointer-events:none;
+  font-size:clamp(18px,5.5vw,26px);color:#fff;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000,0 -2px #000}
+.sub small{display:block;font-size:.62em;color:#ffd84a;letter-spacing:.1em}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;color:var(--dim);font-size:14px}
+button{font:inherit;color:var(--ink);background:#140d22;border:2px solid #3a2a5c;padding:6px 14px;cursor:pointer;letter-spacing:.06em}
+button:hover{border-color:var(--green);color:#fff}
+button[aria-pressed="true"]{border-color:var(--green);color:#fff}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+</style>
+</head><body>
+<div class="stage" id="stage">
+  <canvas id="c" aria-label="Short vertical en pixel art: intercambio de golpes en la azotea, choque final en empate y una tercera figura en la antena"></canvas>
+  <div class="hook" id="hook"></div>
+  <div class="sub" id="sub"></div>
+</div>
+<div class="controls">
+  <button id="sound" type="button" aria-pressed="false">♪ ACTIVAR SONIDO</button>
+  <button id="toggle" type="button">❚❚ PAUSA</button>
+</div>
+<script src="../../engine/sakuga.js"></script>
+<script>
+(()=>{
+const S=window.Sakuga,{P,lerp,ease,easeIn,easeOut,clamp,segAt,lerpPose,rotPt,worldPt,q8,q12}=S;
+const LOOP=9.4;
+
+// ---------- personajes ----------
+const BLUE={head:'hood',
+  pal:{coat:'#232a5c',coatD:'#161a3c',pants:'#13152c',skin:'#f0c4a0',glove:'#d8e8ff',hood:'#1b2350',hair:'#2a3060',tip:'#4fb4ff',aura:'#4fb4ff',dark:'#1f5fa8'},
+  chains:[
+    {key:'coat',anchor:'hip',off:[-4,2],n:3,len:9,w:[8,5],col:'coat',grav:1.2,wind:.8},
+    {key:'braid',anchor:'head',off:[-7,-2],n:7,len:6,w:[3,2],col:'hair',tip:'tip',tipFrom:5,when:c=>c.hoodDown}
+  ]};
+const RED={head:'hair',
+  pal:{coat:'#4a1222',coatD:'#2c0a14',pants:'#1c0810',skin:'#e0b090',glove:'#e0b090',hair:'#15060c',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
+  chains:[
+    {key:'coat',anchor:'hip',off:[-4,2],n:3,len:9,w:[8,5],col:'coat',grav:1.2,wind:.8},
+    {key:'scarf',anchor:'chest',off:[-2,-3],n:7,len:8,w:[4,2],col:'scarf',grav:.5},
+    {key:'pony',anchor:'head',off:[-6,-6],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:.8}
+  ]};
+const GREEN={head:'hood',
+  pal:{coat:'#0c1a14',coatD:'#08120e',pants:'#08120e',skin:'#08120e',glove:'#08120e',hood:'#0c1a14',hair:'#0c1a14',aura:'#5bff9e',dark:'#0f6a3a'},
+  chains:[{key:'cape',anchor:'chest',off:[-3,-2],n:6,len:8,w:[11,5],col:'coat',grav:1.4,wind:.45}]};
+
+// ---------- coreografía ----------
+// O ojos partidos se abren · W enfrentamiento · A anticipación · B embestida · E1 jab/parry · E2 patada/agachada · E3 uppercut/esquive
+// J saltan atrás · B2 embestida final · H hit-stop · C impact · D choque · P pasaron de largo, empate · U la cámara sube a la antena · Z negro · L ojos se cierran
+const T={wide:.9,ant:1.4,dash:1.6,e1:1.85,e1hit:1.97,e2:2.15,e3:2.55,jump:2.9,dash2:3.15,hit:3.4,imp:3.5,clash:3.95,flash:4.7,pass:4.95,cut:5.2,rise:5.5,up:6.2,bolt:6.95,dark:7.5,close:8.2};
+const ANT_X=88,ANT_H=262;
+function state(t){
+  const t12=q12(t),sg=(a,c)=>segAt(t,a,c),sg12=(a,c)=>segAt(t12,a,c);
+  const breath=o=>Math.floor(q8(t)*2.67+o)%2?P.stance2:P.stance;
+  const red={id:'red',pose:breath(1),dir:1,x:-50},blue={id:'blue',pose:breath(0),dir:-1,x:50,hoodDown:true};
+  const s={phase:'O',cam:{zoom:1.1,camX:0,camY:-70},chars:[]};
+  if(t<T.wide)return s;
+  if(t>=T.close){s.phase='L';return s}
+  s.chars=[red,blue];
+  if(t<T.ant){s.phase='W';s.cam={zoom:lerp(1.05,1.15,sg(T.wide,T.ant)),camY:-72}}
+  else if(t<T.dash){s.phase='A';const k=ease(sg12(T.ant,T.ant+.17));red.pose=blue.pose=lerpPose(P.stance,P.crouch,k);s.cam={zoom:1.18,camY:-72}}
+  else if(t<T.e1){s.phase='B';const k=easeIn(sg12(T.dash,T.e1));red.x=lerp(-50,-22,k);blue.x=lerp(50,22,k);red.pose=blue.pose=lerpPose(P.crouch,P.dash,clamp(k*4));
+    s.cam={zoom:lerp(1.18,1.6,k),camY:-70,shake:k*2}}
+  else if(t<T.jump){
+    red.x=-22;blue.x=22;s.cam={zoom:1.6,camY:-70};
+    if(t<T.e2){s.phase='E1';const k=clamp((t12-T.e1)*12/2);red.pose=lerpPose(P.stance,P.jab,k);blue.pose=lerpPose(P.stance,P.parry,clamp(k*1.5));
+      if(t>=T.e1hit&&t<T.e1hit+.06){s.freeze=T.e1hit;s.spark=worldPt(red,P.jab.rH)}s.cam.shake=t>T.e1hit&&t<T.e1hit+.15?3:0}
+    else if(t<T.e3){s.phase='E2';const k=clamp((t12-T.e2)*12/3);blue.pose=lerpPose(P.parry,P.kick,k);red.pose=lerpPose(P.jab,P.duck,clamp(k*2));s.cam.rot=-.06*ease(k)}
+    else{s.phase='E3';const k=clamp((t12-T.e3)*12/3);red.pose=lerpPose(P.duck,P.upper,k);blue.pose=lerpPose(P.kick,P.lean,clamp(k*1.6));s.cam.rot=lerp(-.06,.12,ease(k));s.cam.zoom=1.7}
+  }
+  else if(t<T.dash2){s.phase='J';const k=sg12(T.jump,T.dash2);red.x=lerp(-22,-48,easeOut(k));blue.x=lerp(22,48,easeOut(k));red.y=blue.y=-Math.sin(Math.PI*k)*22;
+    red.pose=blue.pose=P.crouch;s.cam={zoom:lerp(1.7,1.3,k),camY:-72,rot:lerp(.12,0,k)}}
+  else if(t<T.hit){s.phase='B2';const k=easeIn(sg12(T.dash2,T.hit));red.x=lerp(-48,-31,k);blue.x=lerp(48,31,k);red.pose=blue.pose=lerpPose(P.dash,P.strike,clamp(k*2));
+    red.ghosts=[1,2,3].map(i=>[lerp(-48,-31,easeIn(k-i*.25)),0]);blue.ghosts=red.ghosts.map(([x])=>[-x,0]);s.cam={zoom:lerp(1.3,1.7,k),camY:-72,shake:2}}
+  else if(t<T.pass){
+    red.x=-31;blue.x=31;red.pose=blue.pose=P.strike;
+    if(t<T.imp){s.phase='H';s.freeze=T.hit-.01;s.cam={zoom:1.75,camY:-72}}
+    else if(t<T.clash){s.phase='C';s.cam={zoom:1.75,camY:-72,shake:6}}
+    else{s.phase='D';const k=sg(T.clash,T.pass),push=Math.round(Math.sin(t12*9)*2);red.x-=push;blue.x-=push;
+      s.cam={zoom:lerp(1.75,1.3,ease(k)),camY:-74,shake:lerp(4,1,k),rot:Math.sin(t12*5)*.06*(1-k)}}
+  }
+  else if(t<T.up){
+    s.phase='P';red.x=48;red.dir=1;blue.x=-48;blue.dir=-1;
+    red.pose=blue.pose=t<T.rise?P.after:lerpPose(P.after,P.stance,ease(sg12(T.rise,T.rise+.3)));
+    s.cam={zoom:1.2,camY:-66,shake:t>T.cut&&t<T.cut+.1?5:0};
+  }
+  else{
+    s.phase=t<T.dark?'U':'Z';red.x=48;blue.x=-48;blue.dir=-1;red.pose=breath(1);blue.pose=breath(0);
+    const k=ease(sg(T.up,T.bolt-.1));
+    s.chars.push({id:'green',pose:P.crouch,dir:-1,x:ANT_X,y:-ANT_H});
+    s.cam={zoom:lerp(1.2,1.8,k),camX:lerp(0,ANT_X-10,k),camY:lerp(-66,-ANT_H-10,k),shake:t>T.bolt&&t<T.bolt+.2?4:0};
+  }
+  return s;
+}
+const wind=t=>[-(300+200*Math.sin(t*1.3)+(t>T.up?400:0)),-60];
+
+// ---------- dibujo ----------
+const LOOK_BLUE={frame:'#1b2350',edge:'#4fb4ff',rim:'#ff5a6a',iris:['#2a7ad8','#6ec8ff'],bangs:true,flare:'#c8ecff'};
+const LOOK_RED={frame:'#2a0c18',edge:'#ff2e45',rim:'#ff5a6a',iris:['#c41a34','#ff6a7a'],bangs:true,flare:'#ffc8d0'};
+function splitEyes(open,flare){
+  const h=Math.floor(S.PH/2);
+  S.closeup(open,flare,LOOK_BLUE,{x:0,y:0,w:S.PW,h});
+  S.closeup(open,flare,LOOK_RED,{x:0,y:h,w:S.PW,h:S.PH-h});
+  S.R(0,h-1,S.PW,2,'#000');
+}
+function roof(s){
+  const{toPx,wrect,R,ditherFill,hash}=S;
+  for(let i=-12;i<13;i++){const w=30+hash(i)*40,h=20+hash(i+50)*60,x=i*50-s.cam.camX*.4;wrect(x,-h+30,w,h+400,'#0d0817');
+    for(let j=0;j<5;j++)if(hash(i*13+j)>.4){const wx=x+4+hash(i*7+j)*(w-8),wy=-h+36+hash(i*3+j)*60;wrect(wx,wy,2.5,2.5,hash(i+j)>.6?'#ffb070':'#7080ff')}}
+  // antena alta: ahí espera alguien
+  wrect(ANT_X-2,-ANT_H,4,ANT_H,'#0a0611');wrect(ANT_X-16,-ANT_H+40,32,3,'#0a0611');wrect(ANT_X-10,-ANT_H+90,20,3,'#0a0611');
+  if(Math.floor(S.t*2)%2)wrect(ANT_X-3,-ANT_H+30,6,5,'#ff2e45');
+  const[x0,gy]=toPx(-140,0),[x1]=toPx(140,0);
+  R(x0,gy,x1-x0,S.PH,'#160f20');ditherFill(.5,'#0a0710',Math.max(0,Math.round(x0)),gy+Math.round((S.PH-gy)*.35),Math.min(S.PW,Math.round(x1)),S.PH);
+  R(x0,gy,x1-x0,1,'#7a1830');
+  for(let i=0;i<4;i++){const[px,py]=toPx(-90+i*55,6+i*4);R(px,py,10*S.cam.k,1,'#5a1830');R(px+2*S.cam.k,py,4*S.cam.k,1,'#d8243a')}
+}
+function spark(wx,wy){const{toPx,disc,ring,line,hash}=S,[cx,cy]=toPx(wx,wy),k=S.cam.k,f=Math.floor(S.t*24);
+  disc(cx,cy,4*k,'#ffffff');ring(cx,cy,9*k,9*k,'#ffffff');
+  for(let i=0;i<6;i++){const a=hash(f+i)*Math.PI*2,l=(10+hash(f*3+i)*14)*k;line(cx+Math.cos(a)*5*k,cy+Math.sin(a)*5*k,cx+Math.cos(a)*l,cy+Math.sin(a)*l,1,i%2?'#ffd27a':'#ffffff')}}
+function ghostsOf(ch,cols){if(!ch.ghosts)return;[2,1,0].forEach(i=>S.figure({...ch,x:ch.ghosts[i][0],y:ch.ghosts[i][1]},'ink',cols[i]))}
+function cutMark(ch,k){if(k<=0)return;const{toPx,line}=S,[a0,a1]=toPx(...worldPt(ch,[ -4,-78])),[b0,b1]=toPx(...worldPt(ch,[14,-62]));
+  const ex=lerp(a0,b0,clamp(k*3)),ey=lerp(a1,b1,clamp(k*3));line(a0,a1,ex,ey,k<.5?2:1,'#ffffff')}
+
+function render(s){
+  const{toPx,figure,ditherFill,disc,ring,seg}=S,t=S.t;
+  if(s.phase==='O'){splitEyes(ease(seg(.1,.4)),t>.4?1-seg(.4,.85):0);return}
+  if(s.phase==='L'){splitEyes(1-ease(seg(8.7,9.05)),0);ditherFill(1-seg(T.close,T.close+.2),'#020105');return}
+  const by=Object.fromEntries(s.chars.map(c=>[c.id,c]));
+  if(s.phase==='C'){S.impact(T.imp,0,-72,s.chars,'激');return}
+  const bolt=s.phase==='U'&&t>=T.bolt&&t<T.bolt+.12;
+  if(bolt){S.R(0,0,S.PW,S.PH,'#e8fff0')}
+  else S.sky(['#04030a','#08061a','#0e0a24','#1a0c26','#2a1024'],{x:S.PW*.25+s.cam.camX*.02,y:toPx(0,-330)[1]*.3+S.PH*.08,r:S.PW*.16});
+  roof(s);
+  const red=by.red,blue=by.blue,green=by.green;
+  const calm=s.phase==='P'||s.phase==='U'||s.phase==='Z',pw=calm?.3:s.phase==='W'?.5:1;
+  S.aura(blue.x,-50,BLUE.pal,pw);S.aura(red.x,-50,RED.pal,pw);
+  if(s.phase==='D')S.clash(0,-72,T.clash,T.pass,0);
+  S.embers(blue.x,0,BLUE.pal,22,pw,1);S.embers(red.x,0,RED.pal,22,pw,50);
+  ghostsOf(red,['#ff2e45','#8a1024','#40081a']);ghostsOf(blue,['#4fb4ff','#1f5fa8','#122a50']);
+  figure(red,'glow');figure(blue,'glow');
+  if(green){
+    if(bolt)figure(green,'ink','#05030a');
+    else if(t<T.bolt)figure(green,'ink','#05030a');
+    else{figure(green,'glow');const k=S.cam.k,[ex,ey]=toPx(...worldPt(green,[P.crouch.head[0]+4,P.crouch.head[1]-1]));
+      S.ditherDisc(ex,ey,10*k,'#0f6a3a',.6);S.R(ex-2*k,ey,2*k,Math.max(1,k),'#5bff9e');S.R(ex+1*k,ey,2*k,Math.max(1,k),'#5bff9e')}
+  }
+  if(s.phase==='P'){cutMark(red,seg(T.cut,T.cut+.2)*(1-seg(T.up-.3,T.up)));cutMark(blue,seg(T.cut,T.cut+.2)*(1-seg(T.up-.3,T.up)))}
+  if(s.spark)spark(...s.spark);
+  if(s.phase==='B'||s.phase==='B2'||s.phase==='H')S.speedLines(0,24);
+  if(s.phase==='B2'||s.phase==='H')S.focusLines('#e8e0ff',36,2,12);
+  if(s.phase==='E2'||s.phase==='E3')S.focusLines('#e8e0ff',14,1,12);
+  if(s.phase==='H'){const[cx,cy]=toPx(0,-72);disc(cx,cy,6*S.cam.k,'#ffffff');ring(cx,cy,10*S.cam.k,10*S.cam.k,'#ffffff')}
+  if(s.phase==='D'){if(t<T.clash+.4)S.focusLines('#e8e0ff',40,2,24,...toPx(0,-72));ditherFill(seg(T.flash,T.pass),'#ffffff')}
+  if(s.phase==='P')ditherFill(1-seg(T.pass,T.pass+.3),'#ffffff');
+  if(s.phase==='Z')ditherFill(seg(T.dark,T.dark+.4),'#020105');
+}
+function post(s){if(s.phase!=='C'&&s.phase!=='O'&&s.phase!=='L')S.rain(.4)}
+
+// ---------- sonido ----------
+const X=S.sfx;
+const sfx=[
+  [.12,()=>{X.sting(880);X.sting(1320)}],
+  [T.ant,()=>X.inhale(.2)],
+  [T.dash,()=>X.whoosh(.3)],
+  [T.e1hit,X.tap],
+  [T.e2+.05,X.swish],
+  [T.e3+.05,X.swish],
+  [T.jump,()=>X.whoosh(.25)],
+  [T.dash2,()=>X.whoosh(.25)],
+  [T.imp,X.boom],
+  [T.flash-.15,()=>X.rise(.25)],
+  [T.pass,X.bigBoom],
+  [T.cut,X.slash],
+  [T.up,()=>S.noise(.7,'bandpass',200,800,.25,1,true)],
+  [T.bolt,X.thunder],
+  [T.bolt+.3,X.heartbeat],
+  [8.95,()=>S.noise(.4,'highpass',1500,7000,.18,1,true)]
+];
+const drone=s=>({O:.05,W:.12,A:.24,B:.28,E1:.22,E2:.22,E3:.22,J:.2,B2:.3,H:0,C:0,D:.22,P:.06,U:.1,Z:.04,L:.03}[s.phase]??0);
+const ambience=s=>{const g=Math.abs(wind(S.t)[0]),hush=s.phase==='H'||s.phase==='C'||(s.freeze!=null);return{rain:hush?0:.05,wind:hush?0:.03+g/12000,windFreq:280+g*.25}};
+
+S.start({
+  loop:LOOP,vertical:true,camCy:.5,reducedT:2.6,
+  chars:{blue:BLUE,red:RED,green:GREEN},
+  light:{x:-200,rim:'#ff5a6a'},
+  state,wind,render,post,sfx,drone,ambience,crackle:s=>s.phase==='D',
+  subs:[[5.4,6.1,'—…Empate.','引き分けか']],
+  hook:[[0,1.2,'EL QUE PARPADEA PIERDE','瞬きした方が負け']],
+  el:{stage:document.getElementById('stage'),canvas:document.getElementById('c'),toggle:document.getElementById('toggle'),
+      sound:document.getElementById('sound'),sub:document.getElementById('sub'),hook:document.getElementById('hook')}
+});
+})();
+</script>
+</body></html>

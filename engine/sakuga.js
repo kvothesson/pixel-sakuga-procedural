@@ -49,7 +49,14 @@ const toPx=(wx,wy)=>[E.cam.cx+(wx-E.cam.camX)*E.cam.k,E.cam.cy+(wy-E.cam.camY)*E
 function wrect(x,y,w,h,c){const[a,bb]=toPx(x,y);R(a,bb,w*E.cam.k,h*E.cam.k,c)}
 function setCam(c){
   const sh=c.shake||0,sx=Math.round((hash(Math.floor(E.t*24))-.5)*sh),sy=Math.round((hash(Math.floor(E.t*24)+99)-.5)*sh);
-  E.cam={k:(c.zoom||1)*E.u,cx:E.PW/2+sx,cy:E.PH*(scene.camCy??.5)+sy,camX:c.camX||0,camY:c.camY||0};
+  E.cam={k:(c.zoom||1)*E.u,cx:E.PW/2+sx,cy:E.PH*(scene.camCy??.5)+sy,camX:c.camX||0,camY:c.camY||0,rot:c.rot||0};
+}
+// rotación de cámara pixel-exacta: se rota el buffer ya dibujado con vecino más cercano (como el Mode 7 de la SNES)
+function rotateBuffer(a){
+  const W=E.PW,H=E.PH,src=b.getImageData(0,0,W,H),dst=b.createImageData(W,H),zm=1+Math.abs(a)*.9,cs=Math.cos(a)/zm,sn=Math.sin(a)/zm,cx=W/2,cy=H/2,s=src.data,d=dst.data;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const dx=x-cx,dy=y-cy,sx=Math.round(cx+dx*cs+dy*sn),sy=Math.round(cy-dx*sn+dy*cs),o=(y*W+x)*4;
+    if(sx>=0&&sx<W&&sy>=0&&sy<H){const i=(sy*W+sx)*4;d[o]=s[i];d[o+1]=s[i+1];d[o+2]=s[i+2];d[o+3]=255}else d[o+3]=255}
+  b.putImageData(dst,0,0);
 }
 Object.assign(E,{toPx,wrect});
 
@@ -64,6 +71,11 @@ E.P={
  block:{hip:[0,-42],chest:[2,-70],head:[3,-84],lE:[-8,-90],lH:[12,-104],rE:[14,-92],rH:[-6,-106],lK:[-16,-22],lF:[-26,0],rK:[14,-24],rF:[22,0]},
  divekick:{hip:[0,-46],chest:[3,-73],head:[5,-87],lE:[-12,-68],lH:[-20,-80],rE:[14,-72],rH:[24,-84],lK:[-3,-24],lF:[-2,0],rK:[14,-38],rF:[6,-30]},
  tuck:{hip:[0,-40],chest:[6,-58],head:[10,-70],lE:[-2,-50],lH:[10,-40],rE:[14,-50],rH:[18,-40],lK:[10,-30],lF:[0,-22],rK:[16,-28],rF:[6,-18]},
+ jab:{hip:[0,-43],chest:[10,-71],head:[15,-85],lE:[2,-62],lH:[14,-70],rE:[34,-70],rH:[56,-71],lK:[-16,-22],lF:[-28,0],rK:[15,-23],rF:[24,0]},
+ parry:{hip:[0,-44],chest:[0,-72],head:[1,-87],lE:[10,-72],lH:[18,-90],rE:[8,-58],rH:[16,-62],lK:[-14,-22],lF:[-24,0],rK:[13,-23],rF:[22,0]},
+ kick:{hip:[0,-48],chest:[-12,-73],head:[-17,-86],lE:[-24,-62],lH:[-32,-50],rE:[2,-64],rH:[-4,-54],lK:[-3,-24],lF:[-6,0],rK:[24,-62],rF:[48,-80]},
+ lean:{hip:[0,-42],chest:[-12,-66],head:[-21,-78],lE:[-24,-58],lH:[-30,-46],rE:[-2,-60],rH:[6,-52],lK:[-14,-22],lF:[-26,0],rK:[12,-24],rF:[22,0]},
+ duck:{hip:[0,-24],chest:[8,-44],head:[14,-56],lE:[14,-40],lH:[22,-50],rE:[18,-36],rH:[26,-44],lK:[-14,-12],lF:[-26,0],rK:[16,-18],rF:[22,0]},
  after:{hip:[0,-27],chest:[9,-51],head:[15,-64],lE:[-4,-42],lH:[-22,-40],rE:[22,-38],rH:[32,-4],lK:[-20,-14],lF:[-34,0],rK:[15,-25],rF:[13,0]}
 };
 E.lerpPose=(a,c,k)=>{const o={};for(const j in a)o[j]=[lerp(a[j][0],c[j][0],k),lerp(a[j][1],c[j][1],k)];return o};
@@ -215,18 +227,20 @@ E.impact=function(t0,cxW,cyW,chars,kanji='衝'){
 };
 // primer plano de ojos: con open=0 el cuadro es idéntico al inicial → sirve para cerrar loops
 const EYE=["..kkkkkkkkkkk...",".kwwwbbbbbwwwkk.","kwwbbBhhbbbwwwwk","kwwbBBhdddbbwwk.","kwwbbBBddbbbwk..",".kkwbbbbbbbkk...","...kkkkkkkk....."];
-E.closeup=function(open,flare,look){
-  const PW=E.PW,PH=E.PH,f=Math.floor(E.t*12);
-  R(0,0,PW,PH,'#020105');
-  const cx=PW/2,cy=PH*.5,sc=Math.max(1,Math.round(Math.min(PW,PH)/40));
-  const fw=Math.round(Math.min(PW,PH*.6)*.48),fh=Math.round(fw*1.4);
+E.closeup=function(open,flare,look,reg){
+  reg=reg||{x:0,y:0,w:E.PW,h:E.PH};
+  const PW=reg.w,PH=reg.h,f=Math.floor(E.t*12);
+  b.save();b.beginPath();b.rect(reg.x,reg.y,reg.w,reg.h);b.clip();
+  R(reg.x,reg.y,PW,PH,'#020105');
+  const cx=reg.x+PW/2,cy=reg.y+PH*.5+(look.dy||0)*PH;
+  const fw=Math.round(Math.min(PW*.92,PH*.95)*.5),fh=Math.round(fw*1.4),sc=Math.max(1,Math.floor(fw*.82/18));
   for(let y=-fh;y<=fh*.7;y++){const n=y/fh,w=Math.round(fw*Math.sqrt(Math.max(0,1-Math.max(0,n/.7)**2*.85)));R(cx-w-1,cy+y,2*w+2,1,look.edge);R(cx-w,cy+y,2*w,1,look.frame)}
   for(let y=-Math.round(fh*.32);y<=fh*.62;y++){const n=y/(fh*.62),w=Math.round(fw*.8*Math.sqrt(Math.max(0,1-Math.max(0,n)**2)));R(cx-w,cy+y,2*w,1,'#0b0816');R(cx+w-1,cy+y,1,1,look.rim)}
   R(cx-fw*.8,cy-fh*.32,fw*1.6,Math.max(2,sc),look.frame);
   if(look.bangs)for(let i=0;i<7;i++){const x=cx-fw*.75+i*fw*.25,len=fh*(.18+hash(i+3)*.14);line(x-4,cy-fh*.34,x+2,cy-fh*.34+len,Math.max(2,sc*1.5),look.frame)}
   const EC={k:'#000',w:'#e6dcd8',b:look.iris[0],B:look.iris[1],d:'#08020a',h:'#ffffff'};
   for(const sx of[-1,1]){
-    const ex=cx+sx*fw*.42,ey=cy;
+    const ex=cx+sx*fw*.45,ey=cy;
     if(open<.35){R(ex-8*sc,ey,16*sc,sc,'#000');R(ex-7*sc,ey,14*sc,1,look.iris[0]);continue}
     const rows=open<.7?[2,3,4]:[0,1,2,3,4,5,6];
     rows.forEach(r=>{const row=EYE[r];for(let c=0;c<row.length;c++){const ch=row[c];if(ch==='.')continue;
@@ -234,7 +248,8 @@ E.closeup=function(open,flare,look){
     line(ex-9*sc,ey-6*sc,ex+8*sc,ey-7*sc,sc,'#000');
   }
   if(flare>0){const len=PW*1.4*flare;R(cx-len/3,cy-sc*2-1,len*2/3,3,look.flare);R(cx-len/2,cy-sc*2,len,1,'#ffffff')}
-  for(let i=0;i<30;i++)R(hash(f+i*7)*PW,hash(f*2+i*3)*PH,1,1,'#2a2440');
+  for(let i=0;i<30;i++)R(reg.x+hash(f+i*7)*PW,reg.y+hash(f*2+i*3)*PH,1,1,'#2a2440');
+  b.restore();
 };
 
 // ---------- sonido sintetizado ----------
@@ -275,6 +290,9 @@ E.sfx={ // recetas reutilizables
   flap:()=>{for(let i=0;i<3;i++)setTimeout(()=>E.noise(.07,'lowpass',900,300,.35),i*55)},
   vanish:()=>E.noise(.35,'highpass',4000,900,.35),
   sting:(f=1320)=>{E.tone(.9,'triangle',f,f*1.33,.22);E.tone(.9,'sine',f*1.5,f*2,.12);E.noise(.4,'highpass',6000,9000,.2)},
+  tap:()=>{E.noise(.09,'bandpass',1800,600,.6,2);E.tone(.12,'square',220,90,.25);E.tone(.2,'sine',120,60,.5)},
+  swish:()=>E.noise(.22,'bandpass',900,3500,.4,1.5),
+  thunder:()=>{E.noise(1.6,'lowpass',2500,60,.9);E.tone(1.2,'sine',60,30,.6)},
   heartbeat:()=>{E.tone(.18,'sine',70,40,.9);setTimeout(()=>E.tone(.16,'sine',62,38,.7),190)}
 };
 let lastCrackle=-1;
@@ -306,6 +324,7 @@ function frame(){
   const T=Math.floor(E.t*12)/12; // la física también va en twos
   if(E._simT!==T){E.chainCache=simulate(T);E._simT=T}
   scene.render(s);
+  if(E.cam.rot)rotateBuffer(E.cam.rot);
   E.t=realT;
   if(scene.post)scene.post(s);
   ctx.imageSmoothingEnabled=false;ctx.clearRect(0,0,cv.width,cv.height);ctx.drawImage(buf,0,0,E.PW*E.PX,E.PH*E.PX);
