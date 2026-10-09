@@ -78,7 +78,19 @@ E.P={
  duck:{hip:[0,-24],chest:[8,-44],head:[14,-56],lE:[14,-40],lH:[22,-50],rE:[18,-36],rH:[26,-44],lK:[-14,-12],lF:[-26,0],rK:[16,-18],rF:[22,0]},
  after:{hip:[0,-27],chest:[9,-51],head:[15,-64],lE:[-4,-42],lH:[-22,-40],rE:[22,-38],rH:[32,-4],lK:[-20,-14],lF:[-34,0],rK:[15,-25],rF:[13,0]}
 };
-E.lerpPose=(a,c,k)=>{const o={};for(const j in a)o[j]=[lerp(a[j][0],c[j][0],k),lerp(a[j][1],c[j][1],k)];return o};
+// interpolación por ARCOS: cada hueso rota alrededor de su padre (no se acorta ni corta camino en línea recta)
+const PARENT={chest:'hip',head:'chest',lE:'chest',lH:'lE',rE:'chest',rH:'rE',lK:'hip',lF:'lK',rK:'hip',rF:'rK'};
+const ORDER=['hip','chest','head','lE','lH','rE','rH','lK','lF','rK','rF'];
+E.lerpPoseLinear=(a,c,k)=>{const o={};for(const j in a)o[j]=[lerp(a[j][0],c[j][0],k),lerp(a[j][1],c[j][1],k)];return o};
+E.lerpPose=(a,c,k)=>{
+  if(k<=0)return a;if(k>=1)return c;
+  const o={hip:[lerp(a.hip[0],c.hip[0],k),lerp(a.hip[1],c.hip[1],k)]};
+  for(const j of ORDER){if(j==='hip')continue;const pj=PARENT[j];
+    const va=[a[j][0]-a[pj][0],a[j][1]-a[pj][1]],vc=[c[j][0]-c[pj][0],c[j][1]-c[pj][1]];
+    const aa=Math.atan2(va[1],va[0]);let da=Math.atan2(vc[1],vc[0])-aa;da=((da+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
+    const ang=aa+da*k,len=lerp(Math.hypot(...va),Math.hypot(...vc),k);
+    o[j]=[o[pj][0]+Math.cos(ang)*len,o[pj][1]+Math.sin(ang)*len]}
+  return o};
 E.rotPt=(f,[x,y])=>{const cs=Math.cos(f.rot||0),sn=Math.sin(f.rot||0),lx=(f.dir||1)*x;return[lx*cs-y*sn,lx*sn+y*cs]};
 E.worldPt=(f,q)=>{const[rx,ry]=E.rotPt(f,q);return[f.x+rx,(f.y||0)+ry]};
 
@@ -125,8 +137,16 @@ function figure(ch,mode='glow',inkCol){
   const chains=(def.chains||[]).filter(sp=>!sp.when||sp.when(ch)).map(sp=>({sp,pts:cache&&cache.chains[sp.key]?cache.chains[sp.key].map(n=>{const[a,c]=toPx(n.p[0]+sdx,n.p[1]+sdy);return[a+E.SHX,c]}):null})).filter(c=>c.pts);
   const L=(a,c,w,col)=>line(a[0],a[1],c[0],c[1],w,col);
   const [hx,hy]=p.head;
+  // SMEARS: si una mano o un pie se movió mucho desde el cuadro anterior (a 12 fps), se estira por el arco recorrido
+  const smears=[];const prev=E.prevChars&&E.prevChars[ch.id];
+  if(prev&&!ch.noSmear&&prev.dir===ch.dir&&Math.abs((prev.rot||0)-(ch.rot||0))<.5){
+    for(const[j,w,c]of[['lH',4.5,'glove'],['rH',5,'glove'],['lF',4,'pants'],['rF',4,'pants']]){
+      const pw=E.worldPt(prev,prev.pose[j]),cw=E.worldPt(ch,p[j]);if(Math.hypot(cw[0]-pw[0],cw[1]-pw[1])<18)continue;
+      const path=[];for(let i=0;i<=5;i++){const q=i/5,mid=E.lerpPose(prev.pose,p,q),pos={...ch,x:lerp(prev.x,ch.x,q),y:lerp(prev.y||0,ch.y||0,q)};path.push(toPx(...E.worldPt(pos,mid[j])))}
+      smears.push({path,w,c})}}
   const draw=(o,cl)=>{
     const col=c=>cl||c;
+    for(const sm of smears)for(let i=0;i<sm.path.length-1;i++){const q=(i+1)/sm.path.length;L([sm.path[i][0]+E.SHX,sm.path[i][1]],[sm.path[i+1][0]+E.SHX,sm.path[i+1][1]],(sm.w*2*q)*k+o,col(pal[sm.c]))}
     for(const{sp,pts}of chains){if(sp.front)continue;for(let i=0;i<pts.length-1;i++){const w=lerp(sp.w[0],sp.w[1],i/(pts.length-1));
       L(pts[i],pts[i+1],w*k+o,col(sp.tipFrom!=null&&i>=sp.tipFrom?pal[sp.tip]:pal[sp.col]))}}
     L(J.hip,J.lK,10*k+o,col(pal.pants));L(J.lK,J.lF,8*k+o,col(pal.pants));
@@ -322,6 +342,7 @@ function frame(){
   const realT=E.t;if(s.freeze!=null)E.t=s.freeze; // hit-stop: el mundo se congela
   setCam(s.cam||{});
   const T=Math.floor(E.t*12)/12; // la física también va en twos
+  if(s.freeze==null){const L=scene.loop,ps=scene.state(((E.t-1/12)%L+L)%L);E.prevChars=Object.fromEntries((ps.chars||[]).map(c=>[c.id,c]))}else E.prevChars=null;
   if(E._simT!==T){E.chainCache=simulate(T);E._simT=T}
   scene.render(s);
   if(E.cam.rot)rotateBuffer(E.cam.rot);

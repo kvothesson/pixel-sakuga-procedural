@@ -175,3 +175,15 @@ Sakuga.start({
 ### Gancho de serie
 - El Ep. 2 abre con los ojos *de ella* y "ESTA VEZ NO", que contesta el "Otra vez" del Ep. 1, y cierra con "—Ahora sí.".
 - Cada episodio es un loop perfecto por sí solo, pero la serie avanza. Funciona como teaser del siguiente.
+
+---
+
+## 9. Ep. 3 — vueltas 1 y 2
+
+- **Intercambio de golpes:** jab contra parry, patada contra agachada, uppercut contra esquive. Cada contacto lleva un mini hit-stop (0,06 s), una chispa y un sonido `tap`. Los que no conectan llevan un `swish`.
+- **Cámara inclinada (dutch angle):** se rota el buffer ya dibujado con vecino más cercano. Las líneas quedan con los dientes típicos del Mode 7 de la SNES y no se pierde el pixel art. Se escala un poco para no ver esquinas negras.
+- **Primer plano partido:** `closeup(open, flare, look, region)` dibuja dentro de un recorte. Dos regiones forman una pantalla partida.
+- **Teaser de un tercer personaje:** una silueta negra en la antena que solo se revela con el flash de un rayo, y después queda con borde y ojos verdes.
+- **Arcos (en el motor, para todas las escenas):** `lerpPose` interpola cada hueso por ángulo alrededor de su padre. Los miembros barren en curva y no se acortan. `lerpPoseLinear` queda para casos puntuales.
+- **Smears automáticos:** si una mano o un pie avanza más de 18 unidades entre cuadros a 12 fps, el motor dibuja el arco recorrido como un trazo que se afina, con contorno y borde de luz incluidos.
+- **Lección de física:** una cadena con poca amortiguación queda como un palo cuando el ancla baja de golpe. Para bufandas y coletas conviene `damp` entre 0,88 y 0,9 y `grav` cerca de 1.

@@ -26,7 +26,8 @@ Escenas de acción con dirección de anime (sakuga) en pixel art generado por c�
 Abrirla con Playwright, pausar, llamar `window.__seek(t)` en 6 a 12 momentos clave, sacar capturas y armar una grilla para revisarla de un vistazo. Una sola pasada de correcciones por revisión.
 
 ## Próximos pasos
-1. Arcos entre poses (interpolar por curvas en vez de líneas rectas) y smears que estiren el cuerpo.
-2. Cinemática inversa para clavar los pies durante los derrapes.
-3. Iluminación por píxel: que la energía tiña el cuerpo según la distancia.
-4. "Otra Vez · Ep. 3".
+Cada vuelta de mejora es un episodio nuevo; frenar al final de cada uno para que el usuario lo vea.
+1. Ep. 4: anatomía (miembros que se afinan, torso con hombros, relleno de polígonos).
+2. Ep. 5: pies clavados (IK) y sombras de contacto.
+3. Ep. 6: reflejos en la azotea mojada y luz de la energía sobre los cuerpos.
+4. Evaluar dónde está el techo.
