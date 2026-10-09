@@ -200,3 +200,18 @@ Sakuga.start({
 - **Cadenas que arrancan colgando:** si una cadena aparece estirada en horizontal tarda en caer y parece un brazo o un arma. Ahora se inicializa casi vertical.
 - **Personaje sin cara:** con capucha, máscara oscura y dos ojos de color, el misterio se sostiene y no hace falta dibujar rasgos.
 - **Ep. 4 en sí:** cae desde la antena con speed lines verticales, aterriza con una onda elíptica, grietas y un congelado, frena dos golpes a la vez con una cúpula, y la onda despide a ambos con chispas de derrape. Cierra con los diálogos "¿Juntos?" / "…Por esta vez.", que anuncian una alianza para el próximo episodio.
+
+---
+
+## 11. Ep. 5 — pies clavados, marcha procedural y sombras
+
+- **IK de dos huesos** (`ikLeg`): con el largo de muslo y canilla de la pose, la rodilla se resuelve hacia adelante y el pie llega al objetivo. Si el objetivo queda fuera de alcance, la pierna se estira al máximo.
+- **`ch.plant = {lF:[x,y], rF:[x,y]}`** en coordenadas de mundo. El motor convierte a coordenadas locales (`localPt`) y aplica la IK antes de dibujar. Los pies no patinan aunque el cuerpo suba, baje o avance.
+- **`gait(d, {x0, dir, stride, lift, lead, bob})`** es la marcha procedural:
+  - Cada pie pasa el 60 % del ciclo clavado en un punto fijo del piso y el 40 % volando en arco hasta el siguiente.
+  - Devuelve la posición del cuerpo, los dos pies, `swing` (para balancear los brazos entre `walkA` y `walkB`, o entre `runA` y `runB`) y el `bob` de la cadera.
+  - Para caminar: zancada de 24 y elevación de 5. Para correr: zancada de 40, elevación de 11 y torso inclinado.
+- **Sombras de contacto** (`shadow(ch)`): elipse con dither bajo la cadera que se achica y aclara con la altura, más un punto oscuro bajo cada pie apoyado. Los personajes dejan de flotar.
+- **Ojo:** con pies clavados, los smears de pies se comparan contra la pose ya con IK, para no disparar estelas falsas.
+- **Loop con el plano de los pies:** abrir y cerrar con los pies quietos en un charco. La pose final se calcula con la misma función (`finalGreen()`) en el primer y el último segmento, así el cuadro es idéntico. Las ondas de los charcos tienen un período de LOOP/12, así que también cierran.
+- **Truco de giro:** espejar al personaje (`dir`) cada 2 cuadros con la pose de patada se lee como un giro completo, como en el anime.

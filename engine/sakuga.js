@@ -87,6 +87,11 @@ E.P={
  duck:{hip:[0,-24],chest:[8,-44],head:[14,-56],lE:[14,-40],lH:[22,-50],rE:[18,-36],rH:[26,-44],lK:[-14,-12],lF:[-26,0],rK:[16,-18],rF:[22,0]},
  land:{hip:[0,-26],chest:[8,-50],head:[14,-63],lE:[-6,-40],lH:[-4,-28],rE:[22,-36],rH:[26,-2],lK:[16,-16],lF:[22,0],rK:[-14,-6],rF:[-28,0]},
  dualblock:{hip:[0,-44],chest:[0,-72],head:[0,-87],lE:[-15,-73],lH:[-29,-76],rE:[15,-73],rH:[29,-76],lK:[-14,-22],lF:[-26,0],rK:[14,-22],rF:[26,0]},
+ walkA:{hip:[0,-44],chest:[2,-73],head:[5,-88],lE:[-6,-59],lH:[-10,-46],rE:[10,-60],rH:[18,-48],lK:[-8,-22],lF:[-14,0],rK:[10,-22],rF:[16,0]},
+ walkB:{hip:[0,-44],chest:[2,-73],head:[5,-88],lE:[8,-60],lH:[16,-48],rE:[-4,-59],rH:[-8,-46],lK:[-8,-22],lF:[-14,0],rK:[10,-22],rF:[16,0]},
+ runA:{hip:[0,-40],chest:[10,-67],head:[16,-81],lE:[-8,-56],lH:[-4,-44],rE:[22,-58],rH:[28,-70],lK:[-8,-20],lF:[-14,0],rK:[12,-20],rF:[16,0]},
+ runB:{hip:[0,-40],chest:[10,-67],head:[16,-81],lE:[20,-58],lH:[26,-70],rE:[-6,-56],rH:[-2,-44],lK:[-8,-20],lF:[-14,0],rK:[12,-20],rF:[16,0]},
+ sweep:{hip:[0,-18],chest:[-10,-38],head:[-14,-51],lE:[-18,-28],lH:[-26,-14],rE:[-2,-30],rH:[-8,-16],lK:[-12,-8],lF:[-26,0],rK:[18,-10],rF:[42,-3]},
  after:{hip:[0,-27],chest:[9,-51],head:[15,-64],lE:[-4,-42],lH:[-22,-40],rE:[22,-38],rH:[32,-4],lK:[-20,-14],lF:[-34,0],rK:[15,-25],rF:[13,0]}
 };
 // interpolación por ARCOS: cada hueso rota alrededor de su padre (no se acorta ni corta camino en línea recta)
@@ -104,6 +109,24 @@ E.lerpPose=(a,c,k)=>{
   return o};
 E.rotPt=(f,[x,y])=>{const cs=Math.cos(f.rot||0),sn=Math.sin(f.rot||0),lx=(f.dir||1)*x;return[lx*cs-y*sn,lx*sn+y*cs]};
 E.worldPt=(f,q)=>{const[rx,ry]=E.rotPt(f,q);return[f.x+rx,(f.y||0)+ry]};
+E.localPt=(f,[wx,wy])=>{const cs=Math.cos(-(f.rot||0)),sn=Math.sin(-(f.rot||0)),dx=wx-f.x,dy=wy-(f.y||0);return[(dx*cs-dy*sn)*(f.dir||1),dx*sn+dy*cs]};
+
+// ---------- cinemática inversa de dos huesos: el pie va al objetivo, la rodilla dobla hacia adelante ----------
+function ikLeg(pose,K,F,target){
+  const H=pose.hip,L1=Math.hypot(pose[K][0]-H[0],pose[K][1]-H[1]),L2=Math.hypot(pose[F][0]-pose[K][0],pose[F][1]-pose[K][1]);
+  let dx=target[0]-H[0],dy=target[1]-H[1],d=Math.hypot(dx,dy)||1e-3;const ux=dx/d,uy=dy/d;d=Math.min(d,L1+L2-.01);
+  const a=(L1*L1-L2*L2+d*d)/(2*d),h=Math.sqrt(Math.max(0,L1*L1-a*a)),px=H[0]+ux*a,py=H[1]+uy*a;
+  const k1=[px-uy*h,py+ux*h],k2=[px+uy*h,py-ux*h];
+  pose[K]=k1[0]>k2[0]?k1:k2;pose[F]=[H[0]+ux*d,H[1]+uy*d];
+}
+E.plantPose=ch=>{if(!ch.plant)return ch.pose;const p={};for(const j in ch.pose)p[j]=ch.pose[j].slice();
+  if(ch.plant.lF)ikLeg(p,'lK','lF',E.localPt(ch,ch.plant.lF));if(ch.plant.rF)ikLeg(p,'rK','rF',E.localPt(ch,ch.plant.rF));return p};
+// marcha procedural: cada pie queda clavado en el piso mientras el cuerpo avanza, y después vuela en arco al próximo apoyo
+E.gait=function(d,{x0,dir=1,stride=22,lift=6,lead=.3,bob=1.5}){
+  const foot=off=>{const u=d/stride+off,n=Math.floor(u),f=u-n,plant=m=>(m-off+.5+lead)*stride;
+    if(f<.6)return[x0+dir*plant(n),0];const q=(f-.6)/.4;return[x0+dir*lerp(plant(n),plant(n+1),ease(q)),-Math.sin(Math.PI*q)*lift]};
+  const u=d/stride;return{x:x0+dir*d,l:foot(0),r:foot(.5),swing:(Math.sin(u*Math.PI*2)+1)/2,y:-(1-Math.cos(u*Math.PI*4))*bob*.5};
+};
 
 // ---------- física secundaria: cadenas Verlet deterministas ----------
 // Para dibujar el instante T se re-simula desde T-0.8s con paso fijo, leyendo state() en cada subpaso.
@@ -141,7 +164,7 @@ function simulate(T){
 // ---------- personaje ----------
 // capas: contorno (+2) → borde de luz (1 px hacia la luz) → cuerpo → ojo. Nunca líneas internas de 1 px.
 function figure(ch,mode='glow',inkCol){
-  const def=scene.chars[ch.id],pal=def.pal,p=ch.pose,k=E.cam.k;
+  const def=scene.chars[ch.id],pal=def.pal,p=E.plantPose(ch),k=E.cam.k;
   const pt=q=>{const[wx,wy]=E.worldPt(ch,q),[a,c]=toPx(wx,wy);return[a+E.SHX,c]};
   const J={};for(const j in p)J[j]=pt(p[j]);
   const cache=E.chainCache[ch.id],sdx=cache?ch.x-cache.x:0,sdy=cache?(ch.y||0)-cache.y:0;
@@ -152,7 +175,7 @@ function figure(ch,mode='glow',inkCol){
   const smears=[];const prev=E.prevChars&&E.prevChars[ch.id];
   if(prev&&!ch.noSmear&&prev.dir===ch.dir&&Math.abs((prev.rot||0)-(ch.rot||0))<.5){
     for(const[j,w,c]of[['lH',4.5,'glove'],['rH',5,'glove'],['lF',4,'pants'],['rF',4,'pants']]){
-      const pw=E.worldPt(prev,prev.pose[j]),cw=E.worldPt(ch,p[j]);if(Math.hypot(cw[0]-pw[0],cw[1]-pw[1])<18)continue;
+      if(ch.plant&&(j==='lF'||j==='rF'))continue;const pw=E.worldPt(prev,E.plantPose(prev)[j]),cw=E.worldPt(ch,p[j]);if(Math.hypot(cw[0]-pw[0],cw[1]-pw[1])<18)continue;
       const path=[];for(let i=0;i<=5;i++){const q=i/5,mid=E.lerpPose(prev.pose,p,q),pos={...ch,x:lerp(prev.x,ch.x,q),y:lerp(prev.y||0,ch.y||0,q)};path.push(toPx(...E.worldPt(pos,mid[j])))}
       smears.push({path,w,c})}}
   const draw=(o,cl)=>{
@@ -199,7 +222,14 @@ function dissolve(level,fn){
   for(let y=0;y<E.PH;y++)for(let x=0;x<E.PW;x++)if(BAYER[y&3][x&3]/16>=level)lb.clearRect(x,y,1,1);
   b=keep;b.drawImage(layer,0,0);
 }
-Object.assign(E,{figure,dissolve});
+function ditherEllipse(cx,cy,rx,ry,c,level){cx=Math.round(cx);cy=Math.round(cy);if(rx<1||ry<.5||level<=0)return;b.fillStyle=c;
+  for(let dy=-Math.ceil(ry);dy<=Math.ceil(ry);dy++){const y=cy+dy;if(y<0||y>=E.PH)continue;for(let dx=-Math.ceil(rx);dx<=Math.ceil(rx);dx++){const x=cx+dx;if(x<0||x>=E.PW)continue;
+    const d=Math.hypot(dx/rx,dy/ry);if(d>1)continue;if(BAYER[y&3][x&3]/16<level*(1-d*d*.6))b.fillRect(x,y,1,1)}}}
+// sombra de contacto: se achica y aclara cuanto más alto está el personaje; cada pie apoyado oscurece su punto
+function shadow(ch,col='#05030a'){const p=E.plantPose(ch),k=E.cam.k,hgt=Math.max(0,-(ch.y||0));
+  const lv=Math.max(0,.85-hgt/160),[sx,sy]=toPx(ch.x,0);ditherEllipse(sx,sy+1,(22-hgt*.05)*k,(4)*k,col,Math.min(1,lv*1.2));
+  for(const F of['lF','rF']){const[wx,wy]=E.worldPt(ch,p[F]);if(wy<-6)continue;const[fx,fy]=toPx(wx,0);ditherEllipse(fx,fy+1,7*k,2*k,col,1)}}
+Object.assign(E,{figure,dissolve,ditherEllipse,shadow});
 
 // ---------- efectos ----------
 E.sky=function(bands,moon){

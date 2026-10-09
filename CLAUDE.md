@@ -27,6 +27,5 @@ Abrirla con Playwright, pausar, llamar `window.__seek(t)` en 6 a 12 momentos cla
 
 ## Próximos pasos
 Cada vuelta de mejora es un episodio nuevo; frenar al final de cada uno para que el usuario lo vea.
-1. Ep. 5: pies clavados (IK) y sombras de contacto.
-2. Ep. 6: reflejos en la azotea mojada y luz de la energía sobre los cuerpos.
-3. Evaluar dónde está el techo.
+1. Ep. 6: reflejos en la azotea mojada y luz de la energía sobre los cuerpos.
+2. Evaluar dónde está el techo.

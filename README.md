@@ -5,6 +5,7 @@ Escenas de pelea con dirección de anime en pixel art, generadas íntegramente p
 ## Escenas
 | Escena | Formato | Qué estrena |
 |---|---|---|
+| [Otra Vez · Ep. 5](escenas/otra-vez-ep5/) | Short vertical 9:16, loop perfecto de 9,6 s | Pies clavados (IK), caminar y correr procedural, sombras de contacto, combo doble |
 | [Otra Vez · Ep. 4](escenas/otra-vez-ep4/) | Short vertical 9:16, loop perfecto de 9 s | Anatomía (torso, miembros que se afinan, pies), aterrizaje, bloqueo doble |
 | [Otra Vez · Ep. 3](escenas/otra-vez-ep3/) | Short vertical 9:16, loop perfecto de 9,4 s | Intercambio de golpes, arcos y smears, cámara inclinada, ojos partidos, tercer personaje |
 | [Otra Vez · Ep. 2](escenas/otra-vez-ep2/) | Short vertical 9:16, loop perfecto de 8,4 s | Motor compartido, física de pelo y ropa, finta con disolución, viento, derrape |
