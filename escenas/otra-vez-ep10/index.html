@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Otra Vez · Ep. 10</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* Layout: short vertical 9:16 centrado, gancho arriba, subtítulos abajo, controles debajo. Look nocturno fijo (single-theme a propósito). */
+:root{
+  --night:#07050d;
+  --ink:#ece8f6;
+  --dim:#8a83a6;
+  --blue:#4fb4ff;
+  --red:#ff2e45;
+  --green:#5bff9e;
+  --f-pixel:"DotGothic16","MS Gothic",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--ink);margin:0}
+body{font-family:var(--f-pixel);padding-inline:16px;padding-block:16px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.stage{position:relative;width:min(100%,calc(82vh * 9 / 16));aspect-ratio:9/16;max-width:100%;overflow:hidden;background:#000;cursor:pointer;border-radius:10px;box-shadow:0 0 0 2px #10261c}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.hook{position:absolute;top:13%;left:0;right:0;text-align:center;pointer-events:none;font-size:clamp(18px,6vw,30px);letter-spacing:.06em;color:#fff;
+  text-shadow:3px 0 #0f6a3a,-3px 0 #000,0 3px #000,0 -3px #000}
+.hook small{display:block;font-size:.5em;color:#ffd84a;letter-spacing:.2em;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000}
+.sub{position:absolute;left:50%;bottom:17%;transform:translateX(-50%);width:92%;text-align:center;pointer-events:none;
+  font-size:clamp(18px,5.5vw,26px);color:#fff;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000,0 -2px #000}
+.sub small{display:block;font-size:.62em;color:#ffd84a;letter-spacing:.1em}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;color:var(--dim);font-size:14px}
+button{font:inherit;color:var(--ink);background:#140d22;border:2px solid #3a2a5c;padding:6px 14px;cursor:pointer;letter-spacing:.06em}
+button:hover{border-color:var(--green);color:#fff}
+button[aria-pressed="true"]{border-color:var(--green);color:#fff}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+</style>
+</head><body>
+<div class="stage" id="stage">
+  <canvas id="c" aria-label="Episodio completo en pixel art 3D: el eco de Midori sale del charco y lo enfrenta"></canvas>
+  <div class="hook" id="hook"></div>
+  <div class="sub" id="sub"></div>
+</div>
+<div class="controls">
+  <button id="sound" type="button" aria-pressed="false">♪ ACTIVAR SONIDO</button>
+  <button id="toggle" type="button">❚❚ PAUSA</button>
+  <button id="export" type="button">⤓ EXPORTAR VIDEO</button>
+  <span id="status" role="status"></span>
+</div>
+<script src="../../engine/sakuga.js"></script>
+<script src="../../engine/sakuga3d.js"></script>
+<script src="../../engine/produccion.js"></script>
+<script>
+(()=>{
+const S=window.Sakuga,{P,lerp,ease,easeIn,easeOut,clamp,segAt,lerpPose,q8,q12,q24}=S;
+const ANIMATIC=true; // etapa 1: muestra el nombre de cada plano
+
+// ---------- personajes (sin faldón suelto: el abrigo largo es parte del torso) ----------
+const BLUE={head:'hood',pal:{coat:'#2a3270',coatD:'#1a1f48',pants:'#1e2244',pantsD:'#151834',boot:'#0c0d1c',skin:'#f0c4a0',glove:'#d8e8ff',hood:'#1f2858',hair:'#2a3060',tip:'#4fb4ff',aura:'#4fb4ff',dark:'#1f5fa8'},
+  chains:[{key:'braid',anchor:'head',off:[-7,-2,0],n:7,len:6,w:[3,2],col:'hair',tip:'tip',tipFrom:5,grav:1,damp:.9,when:c=>c.hoodDown}]};
+const RED={head:'hair',pal:{coat:'#5a1628',coatD:'#3a0e1a',pants:'#2c121c',pantsD:'#200a12',boot:'#120508',skin:'#e6b892',glove:'#e6b892',hair:'#1e0812',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
+  chains:[{key:'scarf',anchor:'chest',off:[-2,-3,0],n:7,len:8,w:[4,2],col:'scarf',grav:.9,damp:.88},{key:'pony',anchor:'head',off:[-6,-6,0],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}]};
+const GREEN={head:'hood',pal:{coat:'#184232',coatD:'#0e2a1f',pants:'#113024',pantsD:'#0b2219',boot:'#06120c',skin:'#0e1c16',neck:'#0e1c16',glove:'#9affc4',hood:'#184232',hair:'#184232',aura:'#5bff9e',dark:'#0f6a3a'},
+  chains:[{key:'cape',anchor:'chest',off:[-4,-2,0],n:7,len:9,w:[13,8],col:'coatD',grav:1.3,wind:.5,damp:.92}]};
+const SHADE={head:'hair',pal:{coat:'#0a0810',coatD:'#06040a',pants:'#08060c',pantsD:'#050308',boot:'#030206',skin:'#0a0810',neck:'#0a0810',glove:'#cfc8e8',hair:'#0a0810',aura:'#e8e0ff',dark:'#000'},chains:[]};
+
+const ECHO={head:'hood',pal:{coat:'#0a0810',coatD:'#06040a',pants:'#08060c',pantsD:'#050308',boot:'#030206',skin:'#08060c',neck:'#08060c',glove:'#cfc8e8',hood:'#0a0810',hair:'#0a0810',aura:'#e8e0ff',dark:'#000'},
+  chains:[{key:'cape',anchor:'chest',off:[-4,-2,0],n:7,len:9,w:[13,8],col:'coatD',grav:1.3,wind:.5,damp:.92}]};
+
+// ---------- guion: 21 planos medidos en beats (120 bpm → 1 beat = 0,5 s) ----------
+const POS={red:[-40,30],blue:[-62,-12],green:[30,12]},PUD=[0,0];
+const toward=(x,z,tx,tz)=>Math.atan2(tz-z,tx-x);
+const hero=(id,o={})=>({id,x:POS[id][0],z:POS[id][1],yaw:toward(POS[id][0],POS[id][1],...PUD),pose:P.stance,hoodDown:true,...o});
+const echo=o=>({id:'echo',x:PUD[0],z:PUD[1],yaw:Math.PI/2,pose:P.stance,...o});
+const LOOK={echo:{frame:'#05030a',edge:'#e8e0ff',rim:'#e8e0ff',iris:['#cfc8e8','#ffffff'],bangs:false,flare:'#ffffff'},
+  green:{frame:'#184232',edge:'#5bff9e',rim:'#ff5a6a',iris:['#1fae5c','#8affb8'],bangs:false,flare:'#d0ffe4'}};
+const SEQ=S.sequence([
+  // PARTE 1 — gancho
+  {id:'ojos',beats:4,phase:'EYES',state:(lt,k)=>({eyes:ease(clamp(k*2.2)),label:'1 · ojos blancos — "OTRA VEZ"'})},
+  {id:'azotea',beats:6,state:(lt,k)=>({chars:[hero('red'),hero('blue'),hero('green')],cam3:{yaw:lerp(-.5,-.3,k),pitch:.2,ty:-45,D:420,zoom:.95},label:'2 · azotea, lluvia, los tres'})},
+  // PARTE 2 — el eco
+  {id:'midori_mira',beats:4,state:(lt,k)=>({chars:[hero('green',{pose:P.stance})],cam3:{yaw:.9,pitch:-.18,ty:-80,tx:30,tz:12,D:160,zoom:1.9},label:'3 · Midori mira el charco'})},
+  {id:'reflejo',beats:4,state:(lt,k)=>({chars:[hero('green')],cam3:{yaw:.2,pitch:.95,ty:-10,tx:10,tz:5,D:260,zoom:1.6},reflectOnly:1,label:'4 · el reflejo no lo imita'})},
+  {id:'eco_sale',beats:8,state:(lt,k)=>({chars:[hero('red'),hero('blue'),hero('green'),echo({y:lerp(120,0,easeOut(clamp(k*1.3))),rising:k<.77})],cam3:{yaw:lerp(-.2,.2,k),pitch:.15,ty:-55,D:380,zoom:1.05,shake:2},label:'5 · el eco sale del charco'})},
+  {id:'cutin_eco',beats:4,phase:'CUT',state:(lt,k)=>({chars:[echo()],cam3:{yaw:0,pitch:0,ty:-70,D:260,zoom:1.3},cut:{look:LOOK.echo,name:'残響 ECO',sub:'LA SOMBRA DE MIDORI',col:'#e8e0ff',k},label:'6 · cut-in del ECO'})},
+  // PARTE 3 — la pelea
+  {id:'carrera',beats:6,state:(lt,k)=>{const cs=['red','blue','green'].map(id=>{const[x0,z0]=POS[id],yw=toward(x0,z0,...PUD),g=S.gait3(lt*90,{x0,z0,yaw:yw,stride:92,lift:16,lead:.33,bob:3});
+      return{id,x:g.x,z:g.z,y:g.y,yaw:yw,plant3:g.plant3,pose:lerpPose(P.runA,P.runB,g.swing),hoodDown:true}});return{chars:cs.concat([echo({pose:P.charge})]),cam3:{yaw:-.6,pitch:.12,ty:-50,tx:-20,D:300,zoom:1.15},label:'7 · los tres corren'}}},
+  {id:'golpe_kurenai',beats:4,state:(lt,k)=>({chars:[{id:'red',x:-50,z:0,yaw:0,pose:S.keyPose(lt,[[0,P.crouch],[.5,P.strike]])},echo({x:20,yaw:Math.PI,pose:lt<.5?P.stance:P.parry})],cam3:{yaw:.15,pitch:.05,ty:-60,tx:-15,D:220,zoom:1.3},freeze:lt>=.5&&lt<.56?.5:undefined,spark:lt>=.5&&lt<.7?[12,-74,0]:null,label:'8 · golpe de Kurenai (un plano)'})},
+  {id:'golpe_aoi',beats:4,state:(lt,k)=>({chars:[{id:'blue',x:-10,z:0,yaw:0,hoodDown:true,pose:S.keyPose(lt,[[0,P.crouch],[.5,P.upper]])},echo({x:22,yaw:Math.PI,pose:lt<.5?P.stance:P.lean})],cam3:{yaw:-.4,pitch:-.25,ty:-80,D:200,zoom:1.3},freeze:lt>=.5&&lt<.56?.5:undefined,spark:lt>=.5&&lt<.7?[20,-110,0]:null,label:'9 · golpe de Aoi (contrapicado)'})},
+  {id:'puno_camara',beats:6,state:(lt,k)=>({chars:[echo({yaw:Math.PI/2*.86,pose:S.keyPose(lt,[[0,P.stance],[1.6,P.crouch],[2.2,P.strike]])})],cam3:{yaw:.12,pitch:-.04,ty:-70,D:118,zoom:2.2,shake:lt>2.2?6:0},crack:lt>2.3?clamp((lt-2.3)/.4):0,label:'10 · puño a cámara + vidrio'})},
+  {id:'tiempo',beats:8,state:(lt,k)=>({chars:[echo({x:-28,yaw:0,pose:P.parry}),{id:'green',x:30,z:0,yaw:Math.PI,pose:P.kick}],freeze:.01,cam3:{yaw:.4+Math.PI*1.5*ease(k),pitch:.1,ty:-66,D:280,zoom:1.35},spark:[2,-80,0],label:'11 · tiempo congelado, la cámara gira'})},
+  {id:'derriba',beats:6,state:(lt,k)=>{const sp=lt<.8;return{chars:[echo({pose:sp?P.kick:P.stance,yaw:sp?(Math.floor(lt*6)%2?0:Math.PI):Math.PI/2}),
+      {id:'red',x:lerp(-30,-110,easeOut(clamp(lt/.7))),z:20,yaw:0,pose:lt<.7?P.tuck:P.after},{id:'blue',x:lerp(30,110,easeOut(clamp(lt/.7))),z:-20,yaw:Math.PI,hoodDown:true,pose:lt<.7?P.tuck:P.after}],
+      cam3:{yaw:0,pitch:.3,ty:-50,D:360,zoom:.95,shake:lt<.4?6:0},label:'12 · el eco gira y los derriba'}}},
+  {id:'solo',beats:6,state:(lt,k)=>({chars:[{id:'green',x:-45,z:0,yaw:0,pose:P.stance},echo({x:45,yaw:Math.PI})],cam3:{yaw:0,pitch:.08,ty:-60,D:340,zoom:lerp(.9,1.05,k)},label:'13 · Midori queda solo (silencio)'})},
+  {id:'es_mio',beats:4,phase:'CUT',state:(lt,k)=>({chars:[{id:'green',x:-45,z:0,yaw:0,pose:P.stance},echo({x:45,yaw:Math.PI})],cam3:{yaw:0,pitch:.08,ty:-60,D:340,zoom:1.05},cut:{look:LOOK.green,name:'翠 MIDORI',sub:'—ES MÍO.',col:'#5bff9e',k},label:'14 · "Es mío."'})},
+  {id:'carga',beats:6,state:(lt,k)=>({chars:[{id:'green',x:-45,z:0,yaw:0,pose:S.keyPose(lt,[[0,P.stance],[.3,P.charge]])},echo({x:45,yaw:Math.PI,pose:S.keyPose(lt,[[0,P.stance],[.5,P.charge]])})],orbs:k,cam3:{yaw:lerp(-.3,.3,k),pitch:.05,ty:-65,D:300,zoom:1.15},label:'15 · cargan energía'})},
+  // PARTE 4 — clímax
+  {id:'espejo',beats:8,state:(lt,k)=>({chars:[{id:'green',x:-30,z:0,yaw:0,pose:P.charge},echo({x:30,yaw:Math.PI,pose:P.charge})],cam3:{yaw:0,pitch:-.05,ty:-20,D:260,zoom:1.15},orbs:1,label:'16 · espejo sobre el charco'})},
+  {id:'simultaneo',beats:4,state:(lt,k)=>({chars:[{id:'green',x:lerp(-30,-28-62,0)+0,z:0,yaw:0,pose:S.keyPose(lt,[[0,P.crouch],[.6,P.strike]])},echo({x:30,yaw:Math.PI,pose:S.keyPose(lt,[[0,P.crouch],[.6,P.strike]])})],freeze:lt>=.6&&lt<.75?.6:undefined,spark:lt>=.6?[2,-74,0]:null,cam3:{yaw:0,pitch:.02,ty:-70,D:200,zoom:1.5,shake:lt>.6?6:0},label:'17 · golpe simultáneo'})},
+  {id:'impacto',beats:4,phase:'IMPACT',state:(lt,k)=>({chars:[{id:'green',x:-30,z:0,yaw:0,pose:P.strike},echo({x:30,yaw:Math.PI,pose:P.strike})],cam3:{yaw:0,pitch:.02,ty:-70,D:200,zoom:1.5},label:'18 · impact frames'})},
+  {id:'reflejo_roto',beats:8,state:(lt,k)=>({chars:[{id:'green',x:-30,z:0,yaw:0,pose:P.kneel},echo({x:30,yaw:Math.PI,pose:P.kneel,dissolve:1-clamp(k*1.4)})],cam3:{yaw:.2,pitch:.6,ty:-30,D:300,zoom:1.05},crack:clamp(k*2),label:'19 · el reflejo se rompe'})},
+  // PARTE 5 — amanecer
+  {id:'amanecer',beats:8,state:(lt,k)=>({dawn:ease(k),chars:[hero('red',{pose:P.stance}),hero('blue'),{id:'green',x:-10,z:0,yaw:Math.PI/2,pose:P.stance}],cam3:{yaw:lerp(.3,.1,k),pitch:.12,ty:-55,D:380,zoom:1},label:'20 · amanece'})},
+  {id:'final',beats:8,phase:'END',state:(lt,k)=>({dawn:1,chars:[hero('red'),hero('blue'),{id:'green',x:-10,z:0,yaw:Math.PI/2,pose:P.stance}],cam3:{yaw:.1,pitch:.12,ty:-55,D:380,zoom:1},black:k>.55,eyes:k>.6?1-ease(clamp((k-.8)/.15)):0,label:'21 · "Otra vez no." + ojos'})}
+],{bpm:120});
+const LOOP=SEQ.total;
+const state=t=>SEQ.state(t);
+const wind=t=>[-(160+90*Math.sin(t*1.3)),-40,40];
+
+// ---------- dibujo ----------
+function eyesDark(open){const{R,PW,PH}=S,sc=Math.max(1,Math.round(PW/45)),cy=Math.round(PH*.5);R(0,0,PW,PH,'#000000');
+  for(const sx of[-1,1]){const cx=Math.round(PW/2+sx*PW*.14),w=11*sc,h=Math.max(1,Math.round(open*3.5*sc));
+    S.ditherEllipse(cx,cy,w*.9,Math.max(2,h*1.4),'#2a2840',.5*open+.15);R(cx-w/2,cy-Math.floor(h/2),w,h,'#f4f0ff');if(open>.5)R(cx-sx*w/4-sc/2,cy-Math.floor(h/2),sc,h,'#9a96c8')}}
+function drawChar(c){const fy=S.proj(c.x,0,c.z||0)[1],b=S.ctx(),body=()=>{if(c.rising){b.save();b.beginPath();b.rect(0,0,S.PW,Math.round(fy));b.clip();S.figure3(c,'glow');b.restore()}else S.figure3(c,'glow')};
+  if(c.dissolve!==undefined&&c.dissolve<1)S.dissolve(c.dissolve,body);else body()}
+const NIGHT=['#04030a','#08061a','#0e0a24','#1a0c26','#2a1024'],DAWN=['#2a3a6a','#4a5a8a','#8a6a8a','#d88a7a','#ffc890'];
+const mix=(a,b,k)=>{const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16),c=i=>Math.round(((pa>>i)&255)*(1-k)+((pb>>i)&255)*k);return'#'+((1<<24)|(c(16)<<16)|(c(8)<<8)|c(0)).toString(16).slice(1)};
+function render(s){
+  const{disc,ring,seg}=S,t=S.t;
+  if(s.phase==='EYES'||(s.phase==='END'&&s.black)){eyesDark(s.eyes||0);label(s);return}
+  if(s.phase==='IMPACT'){S.impact3(SEQ.start('impacto'),S.PW/2,S.PH*.45,s.chars,'鏡');S.glassCrack(S.PW/2,S.PH*.45,1);label(s);return}
+  const dk=s.dawn||0;S.sky3(NIGHT.map((c,i)=>dk?mix(c,DAWN[i],dk):c));if(dk<.8)S.moon3(-.2,.16,S.PW*.14);S.skyline3();
+  S.floor3(dk?mix('#150e1e','#3a2a3a',dk):'#150e1e','#2a1e3a',420,40);
+  const live=s.chars.filter(c=>!(c.y<0)&&!c.rising&&c.dissolve===undefined);
+  S.reflect3(live,s.reflectOnly?.7:.38);
+  if(!s.reflectOnly){for(const c of live)S.shadow3(c);
+    for(const c of s.chars.slice().sort((a,b)=>S.proj(b.x,-50,b.z||0)[3]-S.proj(a.x,-50,a.z||0)[3]))drawChar(c)}
+  const lights=[];
+  if(s.orbs)for(const c of s.chars){const o=S.w3(c,S.pose3(c).rH),pp=S.proj(...o),r=(2+s.orbs*5)*pp[2]*S.cam3.K,col=c.id==='green'?'#5bff9e':'#e8e0ff';disc(pp[0],pp[1],r+2,col);disc(pp[0],pp[1],r,'#ffffff');lights.push({x:o[0],y:o[1],z:o[2],c:c.id==='green'?[100,255,170]:[230,225,255],r:30+s.orbs*40,i:.4+s.orbs*.5})}
+  if(s.spark){const pp=S.proj(...s.spark),k=pp[2]*S.cam3.K;disc(pp[0],pp[1],7*k,'#ffffff');ring(pp[0],pp[1],14*k,14*k,'#ffffff');lights.push({x:s.spark[0],y:s.spark[1],z:s.spark[2],c:[255,250,240],r:60,i:.8})}
+  S.lightPass(lights);
+  if(s.crack)S.glassCrack(S.PW/2,s.phase==='reflejo_roto'?S.PH*.75:S.PH*.42,s.crack);
+  if(dk<.9)S.rain(.3);
+  if(s.cut)S.cutIn({k:s.cut.k,y:.42,h:.2,slope:-.18,look:s.cut.look,name:s.cut.name,sub:s.cut.sub,col:s.cut.col});
+  label(s);
+}
+function label(s){if(!ANIMATIC||S.exporting)return;S.R(0,S.PH-12,S.PW,12,'#000000');S.pixText(s.label||s.shot.id,S.PW/2,S.PH-6,8,'#ffd84a')}
+
+// ---------- música por sección (La menor; amanecer en Do mayor) ----------
+const AM=[45,41,43,40],PAD_M=[57,60,64],PAD_DAWN=[60,64,67];
+const SECTION={
+  ojos:{pad:PAD_M,level:.7},azotea:{pad:PAD_M,level:.7},midori_mira:{pad:PAD_M,level:.7},reflejo:{pad:PAD_M,hat:1,level:.7},
+  eco_sale:{pad:PAD_M,hat:1,bass:AM,level:.85},cutin_eco:{pad:PAD_M,hat:1,bass:AM,crash:1,crashOnce:0,level:.9},
+  carrera:{kick:2,snare:1,hat:1,bass:AM,arp:[69,72,76,72]},golpe_kurenai:{kick:2,snare:1,hat:1,bass:AM,arp:[69,72,76,72]},golpe_aoi:{kick:2,snare:1,hat:1,bass:AM,arp:[69,72,76,79]},
+  puno_camara:{kick:2,snare:1,hat:1,bass:AM},tiempo:{pad:PAD_M,level:.5},derriba:{kick:2,snare:1,hat:1,bass:AM,crash:1},
+  solo:{pad:PAD_M,level:.45},es_mio:{pad:PAD_M,level:.6},carga:{kick:1,hat:1,bass:AM,arp:[69,72,76,81],level:.9},
+  espejo:{kick:2,snare:1,hat:1,bass:AM,arp:[69,76,72,81],crash:1},simultaneo:{kick:2,snare:1,hat:1,bass:AM},impacto:null,
+  reflejo_roto:{pad:[45,52,57],level:.5},amanecer:{pad:PAD_DAWN,arp:[72,76,79,84],level:.6},final:{pad:PAD_DAWN,level:.4}
+};
+const section=t=>SECTION[SEQ.at(((t%LOOP)+LOOP)%LOOP).id];
+const X=S.sfx;
+const sfx=[[SEQ.start('eco_sale'),()=>S.noise(1.6,'lowpass',200,900,.4,1,true)],[SEQ.start('golpe_kurenai')+.5,()=>{X.tap();X.boom()}],[SEQ.start('golpe_aoi')+.5,()=>{X.tap();X.boom()}],
+  [SEQ.start('puno_camara')+2.25,()=>{X.boom();S.noise(.4,'highpass',4000,9000,.5)}],[SEQ.start('derriba'),X.bigBoom],[SEQ.start('simultaneo')+.6,X.bigBoom],[SEQ.start('impacto'),X.boom],
+  [SEQ.start('reflejo_roto'),()=>{for(let i=0;i<8;i++)setTimeout(()=>S.tone(.3,'triangle',2000+Math.random()*3000,1500,.08),i*40)}]];
+const drone=s=>({EYES:.02,IMPACT:0}[s.phase]??(s.freeze!=null?0:.06));
+const ambience=s=>({rain:s.phase==='EYES'||s.dawn>.9?0:.06,wind:.03,windFreq:320});
+
+S.start({
+  loop:LOOP,vertical:true,reducedT:SEQ.start('tiempo')+1,no2dSmears:true,
+  chars:{blue:BLUE,red:RED,green:GREEN,echo:ECHO},
+  state,wind,render,sfx,drone,ambience,
+  onAudio:(prev,cur)=>S.musicTick(prev,cur,SEQ.bpm,section),
+  setCam:s=>S.setCam3(s.cam3||{}),simulate:T=>S.simulate3(T),
+  subs:[[SEQ.start('final')+.3,SEQ.start('final')+2.1,'—Otra vez no.','二度とない']],
+  hook:[[0,1.8,'OTRA VEZ','また']],hookShadow:'#2a2840',
+  el:{stage:document.getElementById('stage'),canvas:document.getElementById('c'),toggle:document.getElementById('toggle'),
+      sound:document.getElementById('sound'),sub:document.getElementById('sub'),hook:document.getElementById('hook')}
+});
+const st=document.getElementById('status');
+document.getElementById('export').onclick=()=>S.exportVideo({duration:LOOP,onStatus:m=>st.textContent=m});
+})();
+</script>
+</body></html>

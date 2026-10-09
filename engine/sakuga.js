@@ -434,6 +434,7 @@ function audioTick(prev,cur,s){
   if(!run)return;
   for(const[te,fn]of scene.sfx||[]){const hit=cur>=prev?(te>prev&&te<=cur):(te>prev||te<=cur);if(hit)fn()}
   if(scene.crackle&&scene.crackle(s)&&Math.floor(cur*24)!==lastCrackle){lastCrackle=Math.floor(cur*24);if(hash(lastCrackle)>.55)E.sfx.crackle()}
+  if(scene.onAudio)scene.onAudio(prev,cur,s);
 }
 
 // ---------- runtime ----------
@@ -458,9 +459,23 @@ function frame(){
   E.t=realT;
   if(scene.post)scene.post(s);
   ctx.imageSmoothingEnabled=false;ctx.clearRect(0,0,cv.width,cv.height);ctx.drawImage(buf,0,0,E.PW*E.PX,E.PH*E.PX);
+  if(E.exporting)burnText();
   overlays();return s;
 }
+// subtítulos y gancho dibujados en el canvas (para que salgan en el video exportado)
+function burnText(){
+  const W=cv.width,H=cv.height,draw=(txt,small,y,size,col,shadow)=>{if(!txt)return;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font=`${size}px ${FONT}`;ctx.lineWidth=size*.22;ctx.strokeStyle='#000';ctx.lineJoin='round';ctx.strokeText(txt,W/2,y);if(shadow){ctx.fillStyle=shadow;ctx.fillText(txt,W/2+size*.08,y)}ctx.fillStyle=col;ctx.fillText(txt,W/2,y);
+    if(small){ctx.font=`${size*.5}px ${FONT}`;ctx.lineWidth=size*.14;ctx.strokeText(small,W/2,y+size*.8);ctx.fillStyle='#ffd84a';ctx.fillText(small,W/2,y+size*.8)}};
+  const sub=(scene.subs||[]).find(([a,c])=>E.t>=a&&E.t<c),hk=(scene.hook||[]).find(([a,c])=>E.t>=a&&E.t<c);
+  if(hk&&Math.floor(E.t*6)%5!==4)draw(hk[2],hk[3],H*.15,W*.075,'#ffffff',scene.hookShadow||'#c4102a');
+  if(sub)draw(sub[2],sub[3],H*.8,W*.055,'#ffffff');
+}
+E.setExport=function(on){E.exporting=on;if(on){E.PX=8;E.PW=135;E.PH=240;cv.width=1080;cv.height=1920;buf.width=layer.width=E.PW;buf.height=layer.height=E.PH;
+  E.u=scene.vertical?E.PW/220:E.PH/420;E._simT=null}else resize()};
+E.canvas=()=>cv;
 function resize(){
+  if(E.exporting)return;
   const r=stageEl.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,3);
   const Wd=Math.round(r.width*dpr),Hd=Math.round(r.height*dpr);cv.width=Wd;cv.height=Hd;
   E.PX=Math.max(1,Math.round(Math.min(Wd,Hd)/150));E.PW=Math.ceil(Wd/E.PX);E.PH=Math.ceil(Hd/E.PX);

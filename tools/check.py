@@ -10,7 +10,7 @@ async def revisar(pg,path):
     errs=[]
     pg.on('pageerror',lambda e:errs.append(str(e).split('\n')[0]))
     await pg.goto(pathlib.Path(path).resolve().as_uri());await pg.wait_for_timeout(1500)
-    for t in [i*0.7 for i in range(16)]:
+    for t in [i*0.7 for i in range(16)]+[11+i*2.5 for i in range(20)]:
         try:await pg.evaluate(f'window.__seek({t})')
         except Exception as e:errs.append(f't={t:.1f}: '+str(e).split('\n')[1][:160]);break
     return [e for e in errs if not any(x in e for x in IGNORAR)]

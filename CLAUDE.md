@@ -17,6 +17,7 @@ Escenas de acción con dirección de anime (sakuga) en pixel art generado por c�
 ## Estructura
 - `engine/sakuga.js`: motor compartido (primitivas, cámara, poses, física Verlet, efectos, sonido, runtime). Las escenas nuevas se construyen sobre él.
 - `engine/sakuga3d.js`: extensión 3D (cámara orbital, esqueleto con profundidad y giro, física 3D, piso en perspectiva). Se carga después del motor.
+- `engine/produccion.js`: secuenciador de planos en beats, música procedural, exportación de video.
 - `tools/bundle.py`: inlinea el motor y deja una escena en un único HTML para compartirla.
 - `guia/`: la guía viva de la técnica.
 - `escenas/<nombre>/index.html`: una escena por carpeta, abrible directo en el navegador o con GitHub Pages.
@@ -28,9 +29,9 @@ Antes de publicar: `python3 tools/check.py` (abre todas las escenas, las recorre
 Abrirla con Playwright, pausar, llamar `window.__seek(t)` en 6 a 12 momentos clave, sacar capturas y armar una grilla para revisarla de un vistazo. Una sola pasada de correcciones por revisión.
 
 ## Próximos pasos
-Cada vuelta de mejora es un episodio nuevo; frenar al final de cada uno para que el usuario lo vea.
-El rig 2D de perfil llegó a su techo (ver guía, sección 13). Los saltos que quedan son de paradigma:
-1. ~~Esqueleto 3D proyectado~~ hecho en el Ep. 7 (`engine/sakuga3d.js`). Siguiente: luz por píxel y caminata con IK en 3D.
-2. Editor visual de poses y timeline.
-3. Retratos de alta resolución para primeros planos de rostro.
-Todo movimiento nuevo pasa antes por `escenas/lab/` (fondo claro, cuadro por cuadro).
+Ep. 10 (episodio completo, 60 s) en producción por etapas; frenar al final de cada una:
+1. ~~Secuenciador, música, exportación + animatic~~ (hecho).
+2. Planos 1–6 (gancho y el eco) en calidad final.
+3. Planos 7–15 (la pelea).
+4. Planos 16–21 (clímax, amanecer) y pulido.
+El guion está en `escenas/otra-vez-ep10/index.html` (constante `SEQ`). Correr `tools/check.py` antes de publicar.

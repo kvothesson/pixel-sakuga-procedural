@@ -5,6 +5,7 @@ Escenas de pelea con dirección de anime en pixel art, generadas íntegramente p
 ## Escenas
 | Escena | Formato | Qué estrena |
 |---|---|---|
+| [Otra Vez · Ep. 10](escenas/otra-vez-ep10/) | **Episodio completo** 9:16, 60 s (en producción: animatic) | Secuenciador de planos en beats, música procedural por sección, exportar video 1080×1920 |
 | [Otra Vez · Ep. 9](escenas/otra-vez-ep9/) | Short vertical 9:16, loop perfecto de 10,4 s | Montaje con un plano por golpe, cut-ins con ojos y nombre, gigante (escala), remate triple |
 | [Otra Vez · Ep. 8](escenas/otra-vez-ep8/) | Short vertical 9:16, loop perfecto de 10 s | Sombreado cel y contorno estilo FighterZ, poses clave sostenidas, juntas corregidas, luz y pies clavados en 3D, plano cenital |
 | [Otra Vez · Ep. 7](escenas/otra-vez-ep7/) | Short vertical 9:16, loop perfecto de 9,6 s | **3D:** giros, puño contra la cámara, vidrio roto, tiempo congelado con cámara orbitando |

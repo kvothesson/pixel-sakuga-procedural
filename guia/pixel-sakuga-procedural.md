@@ -330,3 +330,17 @@ El salto de paradigma recomendado en la sección 13. El mismo pixel art, pero ah
 - **Plano contrapicado** (`pitch` negativo, mirando hacia arriba) para lo grande, y **plano picado** (`pitch` positivo) para la caída en picada sobre la cabeza.
 - **Nombres originales** de los personajes: 紅 Kurenai (roja), 蒼 Aoi (azul), 翠 Midori (verde).
 - Antes de publicar se corrió `tools/check.py` sobre todas las escenas.
+
+---
+
+## 17. Ep. 10 (episodio completo) — herramientas de producción (`engine/produccion.js`)
+
+- **Secuenciador** (`sequence(shots, {bpm})`): cada plano es un dato `{id, beats, phase, state(lt, k, t)}`, donde `lt` es el tiempo local del plano y `k` va de 0 a 1. Los planos se miden **en beats**, así los cortes caen siempre en el ritmo de la música. `SEQ.start(id)` y `SEQ.end(id)` sirven para sincronizar efectos y sonidos sin escribir tiempos a mano. Reordenar o alargar un plano mueve todo lo demás solo.
+- **Música procedural** (`musicTick(prev, cur, bpm, section)`): un secuenciador de semicorcheas (bombo, redoblante, hi-hat, bajo, pad, arpegio y platillo) que lee una **sección por plano**. Por ejemplo: calma = solo pad, pelea = batería completa, tiempo congelado = pad bajo, amanecer = cambio de La menor a Do mayor. Va atada al tiempo de la escena, así que respeta pausa, seek y loop.
+- **Exportar video** (`exportVideo({duration})`):
+  - Pasa a una resolución interna fija de 135×240 escalada ×8, o sea **1080×1920 pixel perfecto**.
+  - Quema subtítulos y gancho en el canvas.
+  - Graba el canvas más el audio de la escena con MediaRecorder y descarga el archivo. Probado headless: VP9 + Opus, 1080×1920.
+  - Dentro de un artifact de claude.ai el navegador bloquea la descarga, así que hay que exportar desde el archivo local o desde GitHub Pages.
+- **Animatic primero:** el episodio largo se arma primero como animatic (los 21 planos con cámara y poses básicas, la música completa y una etiqueta por plano). Así se aprueban historia y ritmo antes de invertir en pulir cada plano.
+- `tools/check.py` ahora también recorre escenas largas (hasta 60 s).
