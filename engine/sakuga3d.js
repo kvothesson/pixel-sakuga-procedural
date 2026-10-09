@@ -25,7 +25,7 @@ E.horizon=()=>C3.cy-Math.tan(C3.pitch)*C3.D*C3.K;
 // las poses 2D de perfil se convierten solas: lado izquierdo hacia el fondo (z−), derecho hacia la cámara (z+)
 const ZD={hip:0,chest:0,head:0,lE:-8,lH:-7,rE:8,rH:7,lK:-5,lF:-5,rK:5,rF:5};
 E.to3=pose=>{const o={};for(const j in pose){const p=pose[j];o[j]=p.length===3?p.slice():[p[0],p[1],ZD[j]||0]}return o};
-E.w3=(ch,[lx,ly,lz])=>{const cs=Math.cos(ch.yaw||0),sn=Math.sin(ch.yaw||0);return[ch.x+lx*cs-lz*sn,(ch.y||0)+ly,(ch.z||0)+lx*sn+lz*cs]};
+E.w3=(ch,[lx,ly,lz])=>{const sc=ch.scale||1,cs=Math.cos(ch.yaw||0),sn=Math.sin(ch.yaw||0);lx*=sc;ly*=sc;lz*=sc;return[ch.x+lx*cs-lz*sn,(ch.y||0)+ly,(ch.z||0)+lx*sn+lz*cs]};
 // cuánto mira el personaje hacia la cámara (1 de frente, 0 de perfil, −1 de espaldas)
 // pies clavados en 3D: ch.plant3 = {lF:[x,y,z], rF:[x,y,z]} en mundo; la IK se resuelve en el plano del personaje
 E.pose3=ch=>{const p2=E.plantPose({pose:ch.pose});
@@ -47,7 +47,7 @@ const hull=pts=>{const P=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]),cr=(o,a,b
 // dibujo por GRUPOS ordenados por profundidad: cada grupo (pierna, brazo, cuerpo, cadena) lleva su contorno,
 // así un brazo delante del torso se separa con línea, pero las articulaciones de un mismo miembro no se cortan.
 E.figure3=function(ch,mode='glow',inkCol,{mirror=false}={}){
-  const def=E.scene.chars[ch.id],pal=def.pal,K=C3.K;
+  const def=E.scene.chars[ch.id],pal=def.pal,K=C3.K*(ch.scale||1);
   const p=E.pose3(ch);
   const W=q=>{const w=E.w3(ch,q);if(mirror)w[1]=-w[1];return w},Pj=q=>E.proj(...W(q));
   const add=(a,b2)=>[a[0]+b2[0],a[1]+b2[1],a[2]+b2[2]];
@@ -128,6 +128,22 @@ E.lightPass=function(lights){const b=E.ctx(),img=b.getImageData(0,0,E.PW,E.PH),d
   b.putImageData(img,0,0)};
 E.beam3=function(a,b2,w,col,lite){const pa=E.proj(...a),pb=E.proj(...b2);E.beam(pa,pb,w*(pa[2]+pb[2])/2*C3.K,col,lite)};
 
+// ---------- cut-in (estilo juego de pelea / remate de anime) ----------
+// {k: 0→1 progreso, y: centro vertical (fracción), h: alto (fracción), slope, look (para closeup), name, sub, col}
+E.cutIn=function({k,y=.3,h=.2,slope=-.18,look,name,sub,col='#ffffff',dir=1}){
+  if(k<=0)return;const PW=E.PW,PH=E.PH,yc=PH*y,hh=PH*h,slide=Math.round((1-E.easeOut(Math.min(1,k/.35)))*PW*1.2)*dir,out=k>.85?(k-.85)/.15:0;
+  const lay=E.withLayer(()=>{E.R(0,yc-hh,PW,hh*2,'#05030a');E.speedLines(0,18,'#2a2440');E.closeup(1,0,look,{x:0,y:Math.round(yc-hh*.75),w:PW,h:Math.round(hh*1.5)})});
+  const L=lay.getImageData(0,0,PW,PH).data,b=E.ctx(),M=b.getImageData(0,0,PW,PH),m=M.data;
+  const inside=(x,y2)=>{const v=y2-yc-slope*(x-PW/2);return Math.abs(v)<=hh*.5*(1-out)};
+  for(let y2=Math.max(0,Math.floor(yc-hh*2));y2<Math.min(PH,yc+hh*2);y2++)for(let x=0;x<PW;x++){if(!inside(x,y2))continue;const sx=x+slide;if(sx<0||sx>=PW)continue;
+    const si=(y2*PW+sx)*4,o=(y2*PW+x)*4;m[o]=L[si];m[o+1]=L[si+1];m[o+2]=L[si+2];m[o+3]=255}
+  b.putImageData(M,0,0);
+  const edge=s2=>{for(let x=0;x<PW;x++){const y2=Math.round(yc+slope*(x-PW/2)+s2*hh*.5*(1-out));if(x-slide>=0&&x-slide<PW)E.R(x-slide,y2,1,2,col)}};edge(-1);edge(1);
+  // ojos en el centro de la franja; nombre abajo y técnica arriba, sin taparlos
+  if(name&&k<.9){const fs=Math.max(9,Math.round(hh*.26)),x0=PW*.5-slide*.6;E.pixText(name,x0+PW*.12,yc+hh*.3,fs,'#ffffff');
+    if(sub)E.pixText(sub,x0-PW*.1,yc-hh*.3,Math.max(8,Math.round(fs*.7)),col)}
+};
+
 // ---------- física 3D: mismas cadenas Verlet que el motor 2D, con profundidad ----------
 const SIM_STEPS=48,SIM_DT=1/60,GRAV=520;
 E.simulate3=function(T){
@@ -168,8 +184,8 @@ E.floor3=function(fill,lineCol,ext=320,step=40){const hz=E.horizon();E.R(0,hz,E.
   for(let v=-ext;v<=ext;v+=step)for(const[a,b2]of[[[v,0,-ext],[v,0,ext]],[[-ext,0,v],[ext,0,v]]]){
     const n=16;let prev=null;for(let i=0;i<=n;i++){const q=[lerp(a[0],b2[0],i/n),0,lerp(a[2],b2[2],i/n)],pp=E.proj(...q);
       if(pp[3]<40){prev=null;continue}if(prev)E.line(prev[0],prev[1],pp[0],pp[1],1,lineCol);prev=pp}}};
-E.shadow3=function(ch){const pp=E.proj(ch.x,0,ch.z||0),h=Math.max(0,-(ch.y||0));
-  E.ditherEllipse(pp[0],pp[1],(22-h*.05)*pp[2]*C3.K,(6+3*Math.abs(Math.sin(C3.yaw)))*pp[2]*C3.K*.6,'#05030a',Math.max(0,.9-h/160))};
+E.shadow3=function(ch){const pp=E.proj(ch.x,0,ch.z||0),h=Math.max(0,-(ch.y||0)),sc=ch.scale||1;
+  E.ditherEllipse(pp[0],pp[1],(22*sc-h*.05)*pp[2]*C3.K,(6+3*Math.abs(Math.sin(C3.yaw)))*sc*pp[2]*C3.K*.6,'#05030a',Math.max(0,.9-h/160))};
 // reflejo correcto para piso plano: cada personaje se espeja sobre su propio pie (y → −y), no sobre el horizonte
 E.reflect3=function(chars,level=.45){
   const lay=E.withLayer(()=>{for(const ch of chars)E.figure3(ch,'plain',null,{mirror:true})}),Ld=lay.getImageData(0,0,E.PW,E.PH).data;

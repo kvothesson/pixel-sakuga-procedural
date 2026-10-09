@@ -319,3 +319,14 @@ El salto de paradigma recomendado en la sección 13. El mismo pixel art, pero ah
 ### Corrección: el Ep. 7 no pasaba del título
 - Al sacar los faldones con reemplazos de texto quedó un hueco en una lista de cadenas (`chains:[ , {…}]`). El motor leía `undefined.off`, tiraba error en cada cuadro y la escena se quedaba congelada en el primero.
 - Ahora el motor ignora huecos en las listas, y `tools/check.py` recorre todas las escenas buscando errores de JavaScript. **Correrlo siempre antes de publicar:** cambiar el motor puede romper episodios viejos que no se volvieron a mirar.
+
+---
+
+## 16. Ep. 9 — montaje por planos, cut-ins y escala
+
+- **Montaje: un plano por golpe.** Respuesta al amontonamiento del Ep. 8. Cada ataque tiene su propia cámara (`cam3` distinta por fase) y un corte seco entre planos. El espectador siempre sabe quién pega y dónde, porque en cuadro hay solo dos: el que ataca y el blanco.
+- **Cut-in** (`cutIn({k, y, h, slope, look, name, sub, col, dir})`): franja diagonal que entra deslizando, con un primer plano de ojos (`closeup` en una capa, copiado solo dentro de la franja), bordes del color del personaje, nombre abajo y técnica arriba, sin tapar los ojos. Va antes de cada ataque especial, como en los juegos de pelea y los remates de anime. Con tres franjas cruzadas se arma un "cut-in triple" antes del remate en equipo.
+- **Escala por personaje** (`ch.scale`): afecta posiciones, anchos y sombra. Un gigante de escala 3,3 frente a la luna enorme vende el tamaño. Si el atacante le pega en la rodilla, el plano cuenta la escala solo.
+- **Plano contrapicado** (`pitch` negativo, mirando hacia arriba) para lo grande, y **plano picado** (`pitch` positivo) para la caída en picada sobre la cabeza.
+- **Nombres originales** de los personajes: 紅 Kurenai (roja), 蒼 Aoi (azul), 翠 Midori (verde).
+- Antes de publicar se corrió `tools/check.py` sobre todas las escenas.

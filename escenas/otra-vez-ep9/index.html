@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Otra Vez · Ep. 9</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* Layout: short vertical 9:16 centrado, gancho arriba, subtítulos abajo, controles debajo. Look nocturno fijo (single-theme a propósito). */
+:root{
+  --night:#07050d;
+  --ink:#ece8f6;
+  --dim:#8a83a6;
+  --blue:#4fb4ff;
+  --red:#ff2e45;
+  --green:#5bff9e;
+  --f-pixel:"DotGothic16","MS Gothic",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--ink);margin:0}
+body{font-family:var(--f-pixel);padding-inline:16px;padding-block:16px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.stage{position:relative;width:min(100%,calc(82vh * 9 / 16));aspect-ratio:9/16;max-width:100%;overflow:hidden;background:#000;cursor:pointer;border-radius:10px;box-shadow:0 0 0 2px #10261c}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.hook{position:absolute;top:13%;left:0;right:0;text-align:center;pointer-events:none;font-size:clamp(18px,6vw,30px);letter-spacing:.06em;color:#fff;
+  text-shadow:3px 0 #0f6a3a,-3px 0 #000,0 3px #000,0 -3px #000}
+.hook small{display:block;font-size:.5em;color:#ffd84a;letter-spacing:.2em;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000}
+.sub{position:absolute;left:50%;bottom:17%;transform:translateX(-50%);width:92%;text-align:center;pointer-events:none;
+  font-size:clamp(18px,5.5vw,26px);color:#fff;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000,0 -2px #000}
+.sub small{display:block;font-size:.62em;color:#ffd84a;letter-spacing:.1em}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;color:var(--dim);font-size:14px}
+button{font:inherit;color:var(--ink);background:#140d22;border:2px solid #3a2a5c;padding:6px 14px;cursor:pointer;letter-spacing:.06em}
+button:hover{border-color:var(--green);color:#fff}
+button[aria-pressed="true"]{border-color:var(--green);color:#fff}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+</style>
+</head><body>
+<div class="stage" id="stage">
+  <canvas id="c" aria-label="Short vertical en pixel art 3D: una sombra gigante se alza frente a la luna; cada uno ataca en su propio plano con un cut-in y el remate es triple"></canvas>
+  <div class="hook" id="hook"></div>
+  <div class="sub" id="sub"></div>
+</div>
+<div class="controls">
+  <button id="sound" type="button" aria-pressed="false">♪ ACTIVAR SONIDO</button>
+  <button id="toggle" type="button">❚❚ PAUSA</button>
+</div>
+<script src="../../engine/sakuga.js"></script>
+<script src="../../engine/sakuga3d.js"></script>
+<script>
+(()=>{
+const S=window.Sakuga,{P,lerp,ease,easeIn,easeOut,clamp,segAt,lerpPose,q8,q12,q24}=S;
+const LOOP=10.4;
+
+// ---------- personajes (sin faldón suelto: el abrigo largo es parte del torso) ----------
+const BLUE={head:'hood',pal:{coat:'#2a3270',coatD:'#1a1f48',pants:'#1e2244',pantsD:'#151834',boot:'#0c0d1c',skin:'#f0c4a0',glove:'#d8e8ff',hood:'#1f2858',hair:'#2a3060',tip:'#4fb4ff',aura:'#4fb4ff',dark:'#1f5fa8'},
+  chains:[{key:'braid',anchor:'head',off:[-7,-2,0],n:7,len:6,w:[3,2],col:'hair',tip:'tip',tipFrom:5,grav:1,damp:.9,when:c=>c.hoodDown}]};
+const RED={head:'hair',pal:{coat:'#5a1628',coatD:'#3a0e1a',pants:'#2c121c',pantsD:'#200a12',boot:'#120508',skin:'#e6b892',glove:'#e6b892',hair:'#1e0812',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
+  chains:[{key:'scarf',anchor:'chest',off:[-2,-3,0],n:7,len:8,w:[4,2],col:'scarf',grav:.9,damp:.88},{key:'pony',anchor:'head',off:[-6,-6,0],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}]};
+const GREEN={head:'hood',pal:{coat:'#184232',coatD:'#0e2a1f',pants:'#113024',pantsD:'#0b2219',boot:'#06120c',skin:'#0e1c16',neck:'#0e1c16',glove:'#9affc4',hood:'#184232',hair:'#184232',aura:'#5bff9e',dark:'#0f6a3a'},
+  chains:[{key:'cape',anchor:'chest',off:[-4,-2,0],n:7,len:9,w:[13,8],col:'coatD',grav:1.3,wind:.5,damp:.92}]};
+const SHADE={head:'hair',pal:{coat:'#0a0810',coatD:'#06040a',pants:'#08060c',pantsD:'#050308',boot:'#030206',skin:'#0a0810',neck:'#0a0810',glove:'#cfc8e8',hair:'#0a0810',aura:'#e8e0ff',dark:'#000'},chains:[]};
+
+// ---------- coreografía: un PLANO por golpe, con cut-in antes de cada uno ----------
+// O los tres de espaldas, la luna · G se alza el gigante · C1/S1 roja: puño a la rodilla · C2/S2 azul: rayo desde abajo
+// C3/S3 verde: patada en picada a la cabeza · T3 cut-in triple · X remate de tres rayos · H/I impacto · B se deshace · S "Era solo un eco." · E = O
+const T={rise:1.0,c1:2.4,s1:2.9,hit1:3.3,c2:3.5,s2:4.0,hit2:4.45,c3:4.6,s3:5.1,hit3:5.6,tri:5.8,fin:6.3,hit:6.8,imp:6.88,shatter:7.3,calm:8.0,close:9.2};
+const GZ=-260,GS=3.3,TRIO={red:[-25,40],blue:[0,50],green:[25,40]},BACK=-Math.PI/2;
+const CAM_O={yaw:0,pitch:-.1,ty:-115,tz:-30,D:300,zoom:.9};
+const cutK=(t,a,b)=>t>=a&&t<b?(t-a)/(b-a):0;
+function giant(t){const g={id:'giant',x:0,z:GZ,yaw:Math.PI/2,scale:GS,pose:P.stance,y:0};
+  if(t<T.rise||t>=T.calm)return null;
+  if(t<T.c1){g.y=lerp(330,0,easeOut(segAt(q12(t),T.rise,T.c1-.2)));g.rising=1}
+  if(t>=T.hit1)g.pose=P.parry;if(t>=T.hit2)g.pose=P.lean;if(t>=T.hit3)g.pose=P.kneel;
+  if(t>=T.shatter)g.dissolve=1-segAt(t,T.shatter,T.calm-.1);
+  return g}
+function trio(pose='stance'){return Object.entries(TRIO).map(([id,[x,z]])=>({id,x,z,yaw:BACK,pose:P[pose]||pose,hoodDown:true}))}
+function state(t){
+  const t12=q12(t),t24=q24(t),sg=(a,c)=>segAt(t,a,c);
+  const s={phase:'O',cam:{},cam3:{...CAM_O},chars:[],sparks:[],beams:[],cut:null};
+  const G=giant(t);
+  if(t<T.rise||t>=T.close){s.phase=t<T.rise?'O':'E';s.chars=trio();return s}
+  if(t<T.c1){s.phase='G';s.chars=trio().concat([G]);s.cam3={...CAM_O,pitch:lerp(-.1,-.22,sg(T.rise,T.c1)),zoom:lerp(.9,.8,sg(T.rise,T.c1)),shake:3};return s}
+  if(t<T.s1){s.phase='C';s.chars=trio().concat([G]);s.cam3={...CAM_O,pitch:-.22,zoom:.8};s.cut={who:'red',k:cutK(t,T.c1,T.s1)};return s}
+  if(t<T.c2){ // plano 1: la roja corre y le pega en la rodilla
+    s.phase='S1';const red={id:'red',x:-23,z:-45,yaw:BACK,pose:P.stance};
+    if(t<T.hit1-.12){const d=105*easeIn(sg(T.s1,T.hit1-.12)),g=S.gait3(d,{x0:-23,z0:-45,yaw:BACK,stride:92,lift:16,lead:.33,bob:3});Object.assign(red,{x:g.x,z:g.z,y:g.y,plant3:g.plant3,pose:lerpPose(P.runA,P.runB,g.swing)})}
+    else{red.z=-155;red.pose=S.keyPose(t24,[[0,P.crouch],[T.hit1,P.strike]])}
+    if(t>=T.hit1&&t<T.hit1+.07)s.freeze=T.hit1;
+    if(t>=T.hit1&&t<T.hit1+.2)s.sparks.push(S.w3(red,S.pose3(red).rH));
+    s.chars=[red,G];s.cam3={yaw:.75,pitch:.04,ty:-70,tx:-15,tz:-170,D:240,zoom:1.15,shake:t>=T.hit1&&t<T.hit1+.25?6:0};return s}
+  if(t<T.s2){s.phase='C';s.chars=[G];s.cam3={yaw:.75,pitch:.04,ty:-70,tx:-15,tz:-170,D:240,zoom:1.15};s.cut={who:'blue',k:cutK(t,T.c2,T.s2)};return s}
+  if(t<T.c3){ // plano 2: el azul dispara desde abajo al pecho
+    s.phase='S2';const blue={id:'blue',x:40,z:-150,yaw:Math.atan2(GZ+150,-40),pose:S.keyPose(t24,[[0,P.crouch],[T.s2+.12,P.charge],[T.s2+.22,P.fire]]),hoodDown:true};
+    if(t>=T.s2+.22){const o=S.w3(blue,S.pose3(blue).rH),k=easeOut(sg(T.s2+.22,T.hit2)),tg=[0,-235,GZ+12];s.beams.push([o,[lerp(o[0],tg[0],k),lerp(o[1],tg[1],k),lerp(o[2],tg[2],k)],'blue'])}
+    if(t>=T.hit2&&t<T.hit2+.07)s.freeze=T.hit2;if(t>=T.hit2&&t<T.hit2+.15)s.sparks.push([0,-235,GZ+12]);
+    s.chars=[blue,G];s.cam3={yaw:-.55,pitch:-.42,ty:-150,tx:15,tz:-200,D:300,zoom:.85,shake:t>=T.hit2&&t<T.hit2+.2?6:0};return s}
+  if(t<T.s3){s.phase='C';s.chars=[G];s.cam3={yaw:-.55,pitch:-.42,ty:-150,tx:15,tz:-200,D:300,zoom:.85};s.cut={who:'green',k:cutK(t,T.c3,T.s3)};return s}
+  if(t<T.tri){ // plano 3: el verde cae en picada sobre la cabeza
+    s.phase='S3';const tg=[0,-300,GZ+22],k=sg(T.s3,T.hit3),green={id:'green',x:0,yaw:BACK,pose:P.divekick,y:lerp(-470,tg[1],k*k),z:lerp(GZ+110,tg[2],k*k)};
+    if(t>=T.hit3){green.y=tg[1];green.z=tg[2];if(t<T.hit3+.07)s.freeze=T.hit3;if(t<T.hit3+.16)s.sparks.push(tg)}
+    s.chars=[green,G];s.cam3={yaw:.35,pitch:.5,ty:-300,tx:0,tz:GZ+40,D:300,zoom:1.05,shake:t>=T.hit3&&t<T.hit3+.2?6:0};return s}
+  if(t<T.fin){s.phase='T';s.chars=trio('charge').concat([G]);s.cam3={...CAM_O,ty:-100,pitch:-.2,zoom:.85};s.cut={tri:1,k:cutK(t,T.tri,T.fin)};return s}
+  if(t<T.shatter){ // remate: tres rayos desde atrás de ellos a la cabeza del gigante (arrodillado)
+    const tr=trio('fire');s.chars=tr.concat([G]);const head=[0,-225,GZ+28],k=easeOut(sg(T.fin,T.fin+.25));
+    for(const c of tr){const o=S.w3(c,S.pose3(c).rH);s.beams.push([o,[lerp(o[0],head[0],k),lerp(o[1],head[1],k),lerp(o[2],head[2],k)],c.id])}
+    s.phase=t<T.hit?'X':t<T.imp?'H':'I';if(s.phase==='H')s.freeze=T.hit;if(s.phase!=='X')s.sparks.push(head);
+    s.cam3={...CAM_O,ty:-100,pitch:-.18,zoom:.9,shake:s.phase==='X'?3:6};return s}
+  if(t<T.calm){s.phase='B';s.chars=trio('fire').concat([G]);s.cam3={...CAM_O,pitch:lerp(-.18,-.1,sg(T.shatter,T.calm)),shake:t<T.shatter+.3?5:0};return s}
+  s.phase='S';s.chars=trio();return s;
+}
+const wind=t=>[-(160+90*Math.sin(t*1.3)),-40,40];
+
+// ---------- dibujo ----------
+const COL={red:['#ff2e45','#ffb0b8'],blue:['#4fb4ff','#c8ecff'],green:['#5bff9e','#d0ffe4']};
+const LOOK={red:{frame:'#2a0c18',edge:'#ff2e45',rim:'#ff5a6a',iris:['#c41a34','#ff6a7a'],bangs:true,flare:'#ffc8d0'},
+  blue:{frame:'#2a3060',edge:'#4fb4ff',rim:'#ff5a6a',iris:['#2a7ad8','#6ec8ff'],bangs:true,flare:'#c8ecff'},
+  green:{frame:'#184232',edge:'#5bff9e',rim:'#ff5a6a',iris:['#1fae5c','#8affb8'],bangs:false,flare:'#d0ffe4'}};
+const NAME={red:['紅 KURENAI','PUÑO CARMESÍ'],blue:['蒼 AOI','LANZA AZUL'],green:['翠 MIDORI','CAÍDA ESMERALDA']};
+function drawChar(c){
+  const fy=S.proj(c.x,0,c.z||0)[1],b=S.ctx(),body=()=>{if(c.rising){b.save();b.beginPath();b.rect(0,0,S.PW,Math.round(fy));b.clip();S.figure3(c,'glow');b.restore()}else S.figure3(c,'glow')};
+  if(c.dissolve!==undefined&&c.dissolve<1)S.dissolve(c.dissolve,body);else body()}
+function render(s){
+  const{ditherFill,disc,ring,seg}=S,t=S.t;
+  if(s.phase==='I'){S.impact3(T.imp,S.PW/2,S.PH*.3,s.chars,'終');return}
+  S.sky3(['#04030a','#08061a','#0e0a24','#1a0c26','#2a1024']);S.moon3(0,.2,S.PW*.3);S.skyline3();
+  S.floor3('#150e1e','#2a1e3a',420,40);
+  const live=s.chars.filter(c=>c&&!(c.y<0)&&!c.rising&&c.dissolve===undefined);
+  S.reflect3(live,.38);for(const c of live)S.shadow3(c);
+  const sorted=s.chars.filter(Boolean).sort((a,b)=>S.proj(b.x,-50,b.z||0)[3]-S.proj(a.x,-50,a.z||0)[3]);
+  for(const c of sorted)drawChar(c);
+  const lights=[];
+  for(const[a,b2,id]of s.beams){S.beam3(a,b2,8,COL[id][0],COL[id][1]);lights.push({x:a[0],y:a[1],z:a[2],c:id==='red'?[255,60,80]:id==='blue'?[90,190,255]:[100,255,170],r:40,i:.8})}
+  for(const sp of s.sparks){const pp=S.proj(...sp),k=pp[2]*S.cam3.K,f=Math.floor(t*24);disc(pp[0],pp[1],8*k,'#ffffff');ring(pp[0],pp[1],16*k,16*k,'#ffffff');
+    for(let i=0;i<8;i++){const a=S.hash(f+i)*Math.PI*2,l=(16+S.hash(f*3+i)*26)*k;S.line(pp[0]+Math.cos(a)*8*k,pp[1]+Math.sin(a)*8*k,pp[0]+Math.cos(a)*l,pp[1]+Math.sin(a)*l,2,i%2?'#ffd27a':'#ffffff')}
+    lights.push({x:sp[0],y:sp[1],z:sp[2],c:[255,250,240],r:70,i:.8})}
+  S.lightPass(lights);
+  if(s.phase==='B'){const g=s.chars.find(c=>c&&c.id==='giant');for(let i=0;i<40;i++){const ph=(t-T.shatter)*.9+S.hash(i)*.2,[px,py]=S.proj((S.hash(i+1)-.5)*120,-S.hash(i+2)*320-ph*120,GZ+(S.hash(i+3)-.5)*60);
+      S.R(px,py,2,2,i%3?'#e8e0ff':'#ffffff')}ditherFill(1-seg(T.shatter,T.shatter+.35),'#ffffff')}
+  if(s.phase==='G')S.focusLines('#3a3458',20,1,12,S.PW/2,S.PH*.3);
+  if(s.phase==='S1'&&t<T.hit1)S.speedLines(0,20);
+  if(s.phase==='S3'&&t<T.hit3)S.speedLines(Math.PI/2,22);
+  if(s.phase==='X')S.focusLines('#ffffff',36,2,24,S.PW/2,S.PH*.3);
+  S.rain(.3);
+  // cut-ins encima de todo
+  if(s.cut){if(s.cut.tri){['red','blue','green'].forEach((id,i)=>S.cutIn({k:clamp(s.cut.k*1.5-i*.18),y:.2+i*.3,h:.13,slope:i%2?.16:-.16,look:LOOK[id],name:NAME[id][0],col:COL[id][0],dir:i%2?-1:1}))}
+    else{const id=s.cut.who;S.cutIn({k:s.cut.k,y:.42,h:.2,slope:id==='blue'?.18:-.18,look:LOOK[id],name:NAME[id][0],sub:NAME[id][1],col:COL[id][0],dir:id==='blue'?-1:1})}}
+}
+
+// ---------- sonido ----------
+const X=S.sfx;
+const cutSfx=()=>{S.noise(.25,'highpass',800,6000,.35,1,true);S.tone(.3,'square',660,990,.08)};
+const sfx=[
+  [T.rise,()=>{S.noise(1.4,'lowpass',120,500,.5,1,true);S.tone(1.4,'sine',45,40,.5)}],
+  [T.c1,cutSfx],[T.s1,()=>X.whoosh(.35)],[T.hit1,()=>{X.tap();X.boom()}],
+  [T.c2,cutSfx],[T.s2+.22,()=>S.noise(.3,'bandpass',600,2400,.5,1.2)],[T.hit2,X.boom],
+  [T.c3,cutSfx],[T.s3,()=>X.rise(.4)],[T.hit3,()=>{X.tap();X.bigBoom()}],
+  [T.tri,()=>{cutSfx();setTimeout(cutSfx,90);setTimeout(cutSfx,180)}],
+  [T.fin,()=>{X.whoosh(.4);S.noise(.6,'bandpass',600,2400,.5,1.2)}],[T.imp,X.boom],
+  [T.shatter,()=>{X.bigBoom();S.noise(1,'highpass',3000,9000,.3)}],
+  [T.calm+.2,()=>S.tone(1.2,'sine',220,215,.1)]
+];
+const drone=s=>({O:.03,G:.25,C:.05,S1:.2,S2:.25,S3:.25,T:.1,X:.35,H:0,I:0,B:.1,S:.04,E:.03}[s.phase]??0);
+const ambience=s=>{const hush=s.freeze!=null||s.phase==='I'||s.phase==='H'||s.phase==='C'||s.phase==='T';return{rain:hush?0:.07,wind:hush?0:.04,windFreq:320}};
+
+S.start({
+  loop:LOOP,vertical:true,reducedT:6.5,no2dSmears:true,
+  chars:{blue:BLUE,red:RED,green:GREEN,giant:SHADE},
+  state,wind,render,sfx,drone,ambience,
+  setCam:s=>S.setCam3(s.cam3||{}),simulate:T=>S.simulate3(T),
+  subs:[[T.calm+.2,T.close-.15,'—Era solo un eco.','ただの残響だ']],
+  hook:[[0,1.2,'MÁS GRANDE','でかい']],
+  el:{stage:document.getElementById('stage'),canvas:document.getElementById('c'),toggle:document.getElementById('toggle'),
+      sound:document.getElementById('sound'),sub:document.getElementById('sub'),hook:document.getElementById('hook')}
+});
+})();
+</script>
+</body></html>
