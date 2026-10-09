@@ -215,3 +215,12 @@ Sakuga.start({
 - **Ojo:** con pies clavados, los smears de pies se comparan contra la pose ya con IK, para no disparar estelas falsas.
 - **Loop con el plano de los pies:** abrir y cerrar con los pies quietos en un charco. La pose final se calcula con la misma función (`finalGreen()`) en el primer y el último segmento, así el cuadro es idéntico. Las ondas de los charcos tienen un período de LOOP/12, así que también cierran.
 - **Truco de giro:** espejar al personaje (`dir`) cada 2 cuadros con la pose de patada se lee como un giro completo, como en el anime.
+
+### Corrección después del Ep. 5 (feedback: "la caminata no es natural, los pies se ven encorvados")
+- **Rodillas rotas:** muchas poses dejaban la rodilla de la pierna de atrás doblada *hacia atrás* respecto de la línea cadera→pie. Con anatomía eso se lee como pies o piernas encorvadas. El motor ahora refleja cualquier rodilla hacia adelante sobre esa línea (`kneesForward`), sin cambiar el largo de los huesos. Corre en todas las poses.
+- **Error en la marcha:** el pie apoyado tiene que pasar de adelante del cuerpo (+lead) a atrás (−lead). Antes quedaba siempre adelante y caminaban tirados para atrás.
+- **Escala humana:** el ciclo de un pie mide unas 0,7 alturas (zancada de 64 unidades para 95 de alto); correr, cerca de 1 altura (92). Con zancadas cortas arrastran los pies.
+- **Cadera alta al caminar:** casi el largo de la pierna (47,5 de 50), con las piernas casi estiradas en el apoyo. Con la cadera baja parecen agazapados.
+- **Vuelo del pie:** despega por detrás y sube rápido, con el pico en el primer tercio del vuelo (`sin(π·q^0,7)`).
+- **Faldones y capas:** se dibujan con el trazo afinado de los miembros (`limb`), no con pincel cuadrado. Tienen que abrirse hacia abajo (`w:[9,14]`) y usar el color de sombra, si no se leen como una tercera pierna o una caja.
+- **Laboratorio:** `escenas/lab/` muestra un personaje solo y grande caminando, corriendo y parado. Se revisa cuadro por cuadro con `tools/grid.py` antes de usar un movimiento en un episodio.

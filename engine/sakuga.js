@@ -87,8 +87,8 @@ E.P={
  duck:{hip:[0,-24],chest:[8,-44],head:[14,-56],lE:[14,-40],lH:[22,-50],rE:[18,-36],rH:[26,-44],lK:[-14,-12],lF:[-26,0],rK:[16,-18],rF:[22,0]},
  land:{hip:[0,-26],chest:[8,-50],head:[14,-63],lE:[-6,-40],lH:[-4,-28],rE:[22,-36],rH:[26,-2],lK:[16,-16],lF:[22,0],rK:[-14,-6],rF:[-28,0]},
  dualblock:{hip:[0,-44],chest:[0,-72],head:[0,-87],lE:[-15,-73],lH:[-29,-76],rE:[15,-73],rH:[29,-76],lK:[-14,-22],lF:[-26,0],rK:[14,-22],rF:[26,0]},
- walkA:{hip:[0,-44],chest:[2,-73],head:[5,-88],lE:[-6,-59],lH:[-10,-46],rE:[10,-60],rH:[18,-48],lK:[-8,-22],lF:[-14,0],rK:[10,-22],rF:[16,0]},
- walkB:{hip:[0,-44],chest:[2,-73],head:[5,-88],lE:[8,-60],lH:[16,-48],rE:[-4,-59],rH:[-8,-46],lK:[-8,-22],lF:[-14,0],rK:[10,-22],rF:[16,0]},
+ walkA:{hip:[0,-47.5],chest:[3,-76],head:[6,-91],lE:[-8,-62],lH:[-15,-50],rE:[11,-63],rH:[22,-53],lK:[-6,-24],lF:[-12,0],rK:[8,-24],rF:[14,0]},
+ walkB:{hip:[0,-47.5],chest:[3,-76],head:[6,-91],lE:[10,-63],lH:[21,-53],rE:[-7,-62],rH:[-14,-50],lK:[-6,-24],lF:[-12,0],rK:[8,-24],rF:[14,0]},
  runA:{hip:[0,-40],chest:[10,-67],head:[16,-81],lE:[-8,-56],lH:[-4,-44],rE:[22,-58],rH:[28,-70],lK:[-8,-20],lF:[-14,0],rK:[12,-20],rF:[16,0]},
  runB:{hip:[0,-40],chest:[10,-67],head:[16,-81],lE:[20,-58],lH:[26,-70],rE:[-6,-56],rH:[-2,-44],lK:[-8,-20],lF:[-14,0],rK:[12,-20],rF:[16,0]},
  sweep:{hip:[0,-18],chest:[-10,-38],head:[-14,-51],lE:[-18,-28],lH:[-26,-14],rE:[-2,-30],rH:[-8,-16],lK:[-12,-8],lF:[-26,0],rK:[18,-10],rF:[42,-3]},
@@ -119,13 +119,21 @@ function ikLeg(pose,K,F,target){
   const k1=[px-uy*h,py+ux*h],k2=[px+uy*h,py-ux*h];
   pose[K]=k1[0]>k2[0]?k1:k2;pose[F]=[H[0]+ux*d,H[1]+uy*d];
 }
-E.plantPose=ch=>{if(!ch.plant)return ch.pose;const p={};for(const j in ch.pose)p[j]=ch.pose[j].slice();
+function kneesForward(p){
+  for(const[K,F]of[['lK','lF'],['rK','rF']]){const H=p.hip,dx=p[F][0]-H[0],dy=p[F][1]-H[1],L=dx*dx+dy*dy;if(L<1)continue;
+    const kx=p[K][0]-H[0],ky=p[K][1]-H[1],cross=dx*ky-dy*kx; // lado de la línea cadera→pie en que cae la rodilla
+    const fwd=-dy; // dirección "adelante" perpendicular a la línea (mirando a la derecha)
+    if(cross*Math.sign(dy||1)>0&&dy>0){const t=(kx*dx+ky*dy)/L,px=t*dx,py=t*dy;p[K]=[H[0]+2*px-kx,H[1]+2*py-ky]}}
+  return p}
+E.plantPose=ch=>{const p={};for(const j in ch.pose)p[j]=ch.pose[j].slice();kneesForward(p);if(!ch.plant)return p;
   if(ch.plant.lF)ikLeg(p,'lK','lF',E.localPt(ch,ch.plant.lF));if(ch.plant.rF)ikLeg(p,'rK','rF',E.localPt(ch,ch.plant.rF));return p};
 // marcha procedural: cada pie queda clavado en el piso mientras el cuerpo avanza, y después vuela en arco al próximo apoyo
-E.gait=function(d,{x0,dir=1,stride=22,lift=6,lead=.3,bob=1.5}){
-  const foot=off=>{const u=d/stride+off,n=Math.floor(u),f=u-n,plant=m=>(m-off+.5+lead)*stride;
-    if(f<.6)return[x0+dir*plant(n),0];const q=(f-.6)/.4;return[x0+dir*lerp(plant(n),plant(n+1),ease(q)),-Math.sin(Math.PI*q)*lift]};
-  const u=d/stride;return{x:x0+dir*d,l:foot(0),r:foot(.5),swing:(Math.sin(u*Math.PI*2)+1)/2,y:-(1-Math.cos(u*Math.PI*4))*bob*.5};
+E.gait=function(d,{x0,dir=1,stride=22,lift=8,lead=.3,bob=1.5}){
+  // apoyo: el pie queda fijo mientras el cuerpo pasa por encima (de +lead a -lead de zancada)
+  // vuelo: despega por detrás, sube rápido y baja suave adelante (pico en el primer tercio)
+  const foot=off=>{const u=d/stride+off,n=Math.floor(u),f=u-n,plant=m=>(m-off+lead)*stride;
+    if(f<.6)return[x0+dir*plant(n),0];const q=(f-.6)/.4;return[x0+dir*lerp(plant(n),plant(n+1),ease(q)),-Math.sin(Math.PI*Math.pow(q,.7))*lift]};
+  const u=d/stride;return{x:x0+dir*d,l:foot(0),r:foot(.5),swing:(Math.sin(u*Math.PI*2)+1)/2,y:-(1-Math.cos((u-.05)*Math.PI*4))*bob*.5+bob*.3};
 };
 
 // ---------- física secundaria: cadenas Verlet deterministas ----------
@@ -181,14 +189,17 @@ function figure(ch,mode='glow',inkCol){
   const draw=(o,cl)=>{
     const col=c=>cl||c;
     for(const sm of smears)for(let i=0;i<sm.path.length-1;i++){const q=(i+1)/sm.path.length;L([sm.path[i][0]+E.SHX,sm.path[i][1]],[sm.path[i+1][0]+E.SHX,sm.path[i+1][1]],(sm.w*2*q)*k+o,col(pal[sm.c]))}
-    for(const{sp,pts}of chains){if(sp.front)continue;for(let i=0;i<pts.length-1;i++){const w=lerp(sp.w[0],sp.w[1],i/(pts.length-1));
-      L(pts[i],pts[i+1],w*k+o,col(sp.tipFrom!=null&&i>=sp.tipFrom?pal[sp.tip]:pal[sp.col]))}}
+    // cadenas con trazo afinado (no pincel cuadrado): faldones, capas y pelo se leen como tela, no como cajas
+    const chainDraw=(sp,pts)=>{const n=pts.length-1;for(let i=0;i<n;i++){const w0=lerp(sp.w[0],sp.w[1],i/n),w1=lerp(sp.w[0],sp.w[1],(i+1)/n);
+      limb(pts[i],pts[i+1],w0*k+o,w1*k+o,col(sp.tipFrom!=null&&i>=sp.tipFrom?pal[sp.tip]:pal[sp.col]))}};
+    for(const{sp,pts}of chains)if(!sp.front)chainDraw(sp,pts);
     // ANATOMÍA: muslos y brazos que se afinan, pies con punta, torso con hombros y cintura, cuello
     const W=(u)=>u*k+o;
-    const leg=(K,F,toe,c)=>{limb(J.hip,J[K],W(12),W(9),c);limb(J[K],J[F],W(9),W(5.5),c);limb(J[F],toe,W(5.5),W(3.5),col(pal.boot||pal.pants))};
-    leg('lK','lF',pt([p.lF[0]+8,p.lF[1]]),col(pal.pantsD||pal.pants));
+    const leg=(K,F,c)=>{limb(J.hip,J[K],W(12),W(9),c);limb(J[K],J[F],W(9),W(5.5),c);
+      const heel=pt([p[F][0]-2.5,p[F][1]-1.5]),toe=pt([p[F][0]+8,p[F][1]-1]);limb(heel,toe,W(4.5),W(3),col(pal.boot||pal.pants))};
+    leg('lK','lF',col(pal.pantsD||pal.pants));
     limb(J.chest,J.lE,W(8),W(6.5),col(pal.coatD));limb(J.lE,J.lH,W(6.5),W(5),col(pal.coatD));
-    leg('rK','rF',pt([p.rF[0]+8,p.rF[1]]),col(pal.pants));
+    leg('rK','rF',col(pal.pants));
     {const sx=J.chest[0]-J.hip[0],sy=J.chest[1]-J.hip[1],d=Math.hypot(sx,sy)||1,nx=-sy/d,ny=sx/d,wv=(h)=>(h*k+o/2);
       const mid=[(J.chest[0]+J.hip[0])/2,(J.chest[1]+J.hip[1])/2],top=[J.chest[0]+sx/d*3*k,J.chest[1]+sy/d*3*k];
       poly([[top[0]+nx*wv(10.5),top[1]+ny*wv(10.5)],[mid[0]+nx*wv(7),mid[1]+ny*wv(7)],[J.hip[0]+nx*wv(8),J.hip[1]+ny*wv(8)],
@@ -207,7 +218,7 @@ function figure(ch,mode='glow',inkCol){
       const top=pt([hx-2,hy-4]);disc(top[0],top[1],7*k+o/2,col(pal.hair));
       const fr=pt([hx+5,hy-6]);disc(fr[0],fr[1],3*k+o/2,col(pal.hair));
     }
-    for(const{sp,pts}of chains){if(!sp.front)continue;for(let i=0;i<pts.length-1;i++){const w=lerp(sp.w[0],sp.w[1],i/(pts.length-1));L(pts[i],pts[i+1],w*k+o,col(pal[sp.col]))}}
+    for(const{sp,pts}of chains)if(sp.front)chainDraw(sp,pts);
   };
   if(mode==='ink'){draw(0,inkCol);return}
   draw(2,mode==='glow'?pal.aura:'#000');

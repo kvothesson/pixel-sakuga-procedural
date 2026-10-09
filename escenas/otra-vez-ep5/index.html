@@ -51,13 +51,13 @@ const LOOP=9.6;
 const BLUE={head:'hood',
   pal:{coat:'#232a5c',coatD:'#161a3c',pants:'#1a1d3a',pantsD:'#13152c',boot:'#0c0d1c',skin:'#f0c4a0',glove:'#d8e8ff',hood:'#1b2350',hair:'#2a3060',tip:'#4fb4ff',aura:'#4fb4ff',dark:'#1f5fa8'},
   chains:[
-    {key:'coat',anchor:'hip',off:[-4,2],n:3,len:9,w:[8,5],col:'coat',grav:1.2,wind:.8},
+    {key:'coat',anchor:'hip',off:[-6,-2],n:3,len:7.5,w:[9,14],col:'coatD',grav:1.3,wind:.8},
     {key:'braid',anchor:'head',off:[-7,-2],n:7,len:6,w:[3,2],col:'hair',tip:'tip',tipFrom:5,grav:1,damp:.9,when:c=>c.hoodDown}
   ]};
 const RED={head:'hair',
   pal:{coat:'#4a1222',coatD:'#2c0a14',pants:'#261018',pantsD:'#1c0810',boot:'#120508',skin:'#e0b090',glove:'#e0b090',hair:'#15060c',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
   chains:[
-    {key:'coat',anchor:'hip',off:[-4,2],n:3,len:9,w:[8,5],col:'coat',grav:1.2,wind:.8},
+    {key:'coat',anchor:'hip',off:[-6,-2],n:3,len:7.5,w:[9,14],col:'coatD',grav:1.3,wind:.8},
     {key:'scarf',anchor:'chest',off:[-2,-3],n:7,len:8,w:[4,2],col:'scarf',grav:.9,damp:.88},
     {key:'pony',anchor:'head',off:[-6,-6],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}
   ]};
@@ -69,8 +69,8 @@ const GREEN={head:'hood',
 // O pies de él en el charco · W caminan juntos (pies clavados) · R corren · K1 ella salta desde las manos de él · K2 picada + barrida
 // H hit-stop · C impact · X él gira y los despide · S "Todavía no", se va caminando · Z la cámara baja a sus pies · E mismos pies (= cuadro 0)
 const T={walk:1.0,run:3.0,boost:3.6,dive:3.95,hit:4.25,imp:4.33,spin:4.7,land:5.2,talk:5.7,leave:6.4,down:7.6,close:8.4};
-const GX=60,WALK=45,RUN=140;
-const FINAL=gait(15,{x0:GX,dir:1,stride:18,lift:4,bob:.6});
+const GX=60,WALK=70,RUN=150;
+const FINAL=gait(30,{x0:GX,dir:1,stride:48,lift:6,bob:.8});
 const finalGreen=()=>({id:'green',pose:lerpPose(P.walkA,P.walkB,FINAL.swing),dir:1,x:FINAL.x,y:FINAL.y,plant:{lF:FINAL.l,rF:FINAL.r}});
 const BLOCK=rotPt({dir:-1},P.upper.rH),CONTACT=[GX+BLOCK[0],BLOCK[1]-2];
 const DIVE={dir:1,rot:.9};const RED_AT=(()=>{const[fx,fy]=rotPt(DIVE,P.strike.rH);return[CONTACT[0]-fx,CONTACT[1]-fy]})();
@@ -84,15 +84,15 @@ function state(t){
   const red={id:'red',dir:1},blue={id:'blue',dir:1,hoodDown:true},green={id:'green',pose:breath(0),dir:-1,x:GX};
   s.chars=[blue,red,green];
   if(t<T.run){s.phase='W';const d=(t12-T.walk)*WALK;
-    for(const[c,x0]of[[red,-150],[blue,-178]]){const g=gait(d,{x0,stride:24,lift:5,bob:1.2});c.x=g.x;c.y=g.y;c.plant={lF:g.l,rF:g.r};c.pose=lerpPose(P.walkA,P.walkB,g.swing)}
+    for(const[c,x0]of[[red,-215],[blue,-243]]){const g=gait(d,{x0,stride:64,lift:9,bob:1.6});c.x=g.x;c.y=g.y;c.plant={lF:g.l,rF:g.r};c.pose=lerpPose(P.walkA,P.walkB,g.swing)}
     s.cam={zoom:1.2,camX:red.x+18,camY:-52}}
   else if(t<T.boost){s.phase='R';const d=(t12-T.run)*RUN;
-    for(const[c,x0]of[[red,-60],[blue,-80]]){const g=gait(d,{x0,stride:40,lift:11,lead:.35,bob:2.5});c.x=g.x;c.y=g.y;c.plant={lF:g.l,rF:g.r};c.pose=lerpPose(P.runA,P.runB,g.swing)}
+    for(const[c,x0]of[[red,-75],[blue,-103]]){const g=gait(d,{x0,stride:92,lift:16,lead:.33,bob:3});c.x=g.x;c.y=g.y;c.plant={lF:g.l,rF:g.r};c.pose=lerpPose(P.runA,P.runB,g.swing)}
     s.cam={zoom:1.45,camX:red.x+20,camY:-55,rot:-.04}}
   else if(t<T.hit){
     blue.x=10;
-    if(t<T.dive){s.phase='K1';const k=sg12(T.boost,T.dive);blue.pose=lerpPose(P.crouch,P.upper,clamp(k*3));
-      red.x=lerp(24,APEX[0],k);red.y=lerp(0,APEX[1],easeOut(k));red.pose=P.tuck;red.rot=-Math.PI*2*k;
+    if(t<T.dive){s.phase='K1';const k=sg12(T.boost,T.dive);blue.pose=lerpPose(P.crouch,P.upper,clamp(k*3));blue.x=lerp(-13,10,clamp(k*3));
+      red.x=lerp(15,APEX[0],k);red.y=lerp(0,APEX[1],easeOut(k));red.pose=P.tuck;red.rot=-Math.PI*2*k;
       s.cam={zoom:1.15,camX:30,camY:lerp(-80,-110,k)}}
     else{s.phase='K2';const k=sg12(T.dive,T.hit);red.pose=P.strike;red.dir=1;red.rot=DIVE.rot;red.x=lerp(APEX[0],RED_AT[0],k*k);red.y=lerp(APEX[1],RED_AT[1],k*k);
       red.ghosts=[1,2,3].map(i=>{const kk=clamp(k-i/12/(T.hit-T.dive));return[lerp(APEX[0],RED_AT[0],kk*kk),lerp(APEX[1],RED_AT[1],kk*kk)]});
@@ -113,7 +113,7 @@ function state(t){
   else{
     red.x=-84;red.pose=P.after;blue.x=-44;blue.pose=P.after;red.y=blue.y=Math.floor(q8(t)*2.67)%2?-1:0; // jadean
     if(t<T.leave){s.phase='S';s.cam={zoom:1.0,camX:10,camY:-70}}
-    else if(t<T.down){s.phase='S';const d=15*ease(sg12(T.leave,T.down-.15)),g=gait(d,{x0:GX,dir:1,stride:18,lift:4,bob:.6});
+    else if(t<T.down){s.phase='S';const d=30*ease(sg12(T.leave,T.down-.15)),g=gait(d,{x0:GX,dir:1,stride:48,lift:6,bob:.8});
       green.dir=1;green.x=g.x;green.y=g.y;green.plant={lF:g.l,rF:g.r};green.pose=lerpPose(P.walkA,P.walkB,g.swing);s.cam={zoom:1.0,camX:lerp(10,30,sg(T.leave,T.down)),camY:-70}}
     else{s.phase='Z';Object.assign(green,finalGreen());const k=ease(sg(T.down,T.close));s.cam={zoom:lerp(1,4.2,k),camX:lerp(30,FINAL.x,k),camY:lerp(-70,-7,k)}}
   }
@@ -166,9 +166,9 @@ const X=S.sfx;
 const step=()=>S.noise(.06,'lowpass',700,200,.35);
 const sfx=[
   [.12,()=>S.noise(.5,'highpass',2000,6000,.12,1,true)],
-  ...[0,1,2,3,4,5,6,7].map(i=>[T.walk+.13+i*.27,step]),
+  ...[0,1,2,3,4].map(i=>[T.walk+.2+i*.46,step]),
   [T.run,()=>X.whoosh(.25)],
-  ...[0,1,2].map(i=>[T.run+.1+i*.15,step]),
+  ...[0,1,2].map(i=>[T.run+.12+i*.3,step]),
   [T.boost,()=>{X.whoosh(.3);step()}],
   [T.dive,()=>X.rise(.25)],
   [T.imp,X.boom],

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laboratorio de movimiento</title>
+<style>:root{color-scheme:dark}html,body{background:#07050d;margin:0;color:#ccc;font-family:monospace}body{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px}
+.stage{position:relative;width:min(100%,420px);aspect-ratio:9/16;background:#000}canvas{width:100%;height:100%;image-rendering:pixelated;display:block}</style>
+</head><body>
+<div class="stage" id="stage"><canvas id="c"></canvas><div id="sub"></div></div>
+<button id="toggle" type="button">❚❚ PAUSA</button>
+<!-- Banco de pruebas: 0-4 s camina, 4-6 s corre, 6-8 s parado. Modo ?id=… no aplica: se edita aquí. -->
+<script src="../../engine/sakuga.js"></script>
+<script>
+const S=window.Sakuga,{P,lerpPose,gait}=S;
+const RED={head:'hair',pal:{coat:'#4a1222',coatD:'#2c0a14',pants:'#261018',pantsD:'#1c0810',boot:'#120508',skin:'#e0b090',glove:'#e0b090',hair:'#15060c',tip:'#c41a34',scarf:'#d81e3a',aura:'#ff2e45',dark:'#8a1024'},
+  chains:[{key:'coat',anchor:'hip',off:[-6,-2],n:3,len:7.5,w:[9,14],col:'coatD',grav:1.3},{key:'pony',anchor:'head',off:[-6,-6],n:6,len:7,w:[5,1.5],col:'hair',tip:'tip',tipFrom:4,grav:1,damp:.9}]};
+function state(t){const t12=S.q12(t),c={id:'red',dir:1};
+  if(t<4){const g=gait(t12*70,{x0:0,stride:64,lift:9,bob:1.6});Object.assign(c,{x:g.x,y:g.y,plant:{lF:g.l,rF:g.r},pose:lerpPose(P.walkA,P.walkB,g.swing)})}
+  else if(t<6){const g=gait(280+(t12-4)*150,{x0:0,stride:92,lift:16,lead:.33,bob:3});Object.assign(c,{x:g.x,y:g.y,plant:{lF:g.l,rF:g.r},pose:lerpPose(P.runA,P.runB,g.swing)})}
+  else Object.assign(c,{x:460,pose:P.stance});
+  return{phase:'lab',cam:{zoom:2.6,camX:c.x,camY:-48},chars:[c]}}
+function render(s){const{R,toPx}=S;R(0,0,S.PW,S.PH,'#120c1c');const[,gy]=toPx(0,0);R(0,gy,S.PW,S.PH,'#1e1530');
+  for(let i=-40;i<60;i++){const[x]=toPx(i*12,0);R(x,gy,1,4,'#3a2c58')}S.shadow(s.chars[0]);S.figure(s.chars[0],'plain')}
+S.start({loop:8,vertical:true,state,render,chars:{red:RED},light:{x:9999,rim:'#ff5a6a'},el:{stage:stage,canvas:c,toggle:toggle,sub:document.getElementById('sub')}});
+</script></body></html>
