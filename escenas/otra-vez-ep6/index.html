@@ -72,7 +72,7 @@ const SHADE={head:'hair',pal:{coat:'#06040a',coatD:'#06040a',pants:'#06040a',pan
 // O charco vacío · W se enfrentan · C cargan energía (la luz los tiñe) · F disparan · H hit-stop · I impact · X blanco
 // A quedan de rodillas; en el reflejo hay alguien que arriba no está · Z la cámara baja al charco · E charco vacío (= cuadro 0)
 const T={wide:1.0,ghost1:1.55,ghost2:1.75,charge:2.2,fire:3.6,hit:4.6,imp:4.68,white:5.1,after:5.5,ghost3:6.7,ask:7.0,down:8.0,close:8.8};
-const RX=-58,BX=-88,GX=62,CENTER=[-8,-70];
+const RX=-50,BX=-84,GX=62,CENTER=[-4,-72];
 const PUDDLE={zoom:2.4,camX:150,camY:24};
 function state(t){
   const t12=q12(t),sg=(a,c)=>segAt(t,a,c),sg12=(a,c)=>segAt(t12,a,c);
@@ -83,14 +83,14 @@ function state(t){
   const red={id:'red',pose:breath(1),dir:1,x:RX},blue={id:'blue',pose:breath(0),dir:1,x:BX,hoodDown:true},green={id:'green',pose:breath(.5),dir:-1,x:GX};
   s.chars=[blue,red,green];
   if(t<T.charge){s.phase='W';s.cam={zoom:1.0,camX:-10,camY:lerp(-40,-62,ease(sg(T.wide,T.charge)))}}
-  else if(t<T.fire){s.phase='C';const k=ease(sg12(T.charge,T.charge+.35));for(const c of s.chars)c.pose=lerpPose(P.stance,P.charge,k);
+  else if(t<T.fire){s.phase='C';const k=ease(sg12(T.charge,T.charge+.35));for(const c of s.chars)c.pose=lerpPose(P.stance,c.id==='red'?P.lowcharge:P.charge,k);
     s.cam={zoom:lerp(1.0,1.18,ease(sg(T.charge,T.fire))),camX:-10,camY:-66,shake:sg(T.charge,T.fire)*2}}
-  else if(t<T.white){for(const c of s.chars)c.pose=P.fire;
+  else if(t<T.white){for(const c of s.chars)c.pose=c.id==='red'?P.lowfire:P.fire;
     if(t<T.hit){s.phase='F';s.cam={zoom:1.2,camX:-10,camY:-66,shake:4,rot:Math.sin(t12*6)*.05}}
     else if(t<T.imp){s.phase='H';s.freeze=T.hit-.01;s.cam={zoom:1.25,camX:-10,camY:-66}}
     else{s.phase='I';s.cam={zoom:1.25,camX:-10,camY:-66,shake:6}}}
   else if(t<T.down){s.phase=t<T.after?'X':'A';const bob=Math.floor(q8(t)*2.67)%2?-1:0;
-    for(const c of s.chars){c.pose=t<T.after?P.fire:P.kneel;c.y=t<T.after?0:bob}
+    for(const c of s.chars){c.pose=t<T.after?(c.id==='red'?P.lowfire:P.fire):P.kneel;c.y=t<T.after?0:bob}
     s.cam={zoom:1.0,camX:-10,camY:-62}}
   else{s.phase='Z';for(const c of s.chars)c.pose=P.kneel;const k=ease(sg(T.down,T.close));
     s.cam={zoom:lerp(1,PUDDLE.zoom,k),camX:lerp(-10,PUDDLE.camX,k),camY:lerp(-62,PUDDLE.camY,k)}}

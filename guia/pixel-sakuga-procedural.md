@@ -258,3 +258,8 @@ Sakuga.start({
 1. **Esqueleto 3D proyectado y pixelado:** el mismo rig con profundidad, rotación y cámara que orbita. Habilita giros reales, escorzo (un puño hacia la cámara), vistas 3/4 y planos con perspectiva. Es el salto más grande disponible.
 2. **Herramienta de coreografía:** un editor visual de poses y timeline. Hoy cada pose es un número escrito a mano, y ese es el cuello de botella creativo.
 3. **Rostros en primeros planos:** retratos pixelados a más resolución para los cortes de cara, sin tocar el plano general.
+
+### Corrección: un rayo no puede atravesar a un aliado (feedback del Ep. 6)
+- Si dos aliados disparan desde el mismo lado, alinearlos en la misma línea hace que el rayo de atrás le cruce el cuerpo al de adelante, y se lee como que lo ataca.
+- Composición de combo: **el de adelante, agachado** (`lowcharge` / `lowfire`), y **el de atrás, de pie**, disparando por encima de su cabeza. Los rayos convergen en el blanco desde dos alturas.
+- Regla general: antes de dibujar un proyectil, revisar que su trayectoria no pase por la silueta de un personaje que no es el objetivo.
