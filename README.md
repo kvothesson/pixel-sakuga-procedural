@@ -5,6 +5,7 @@ Escenas de pelea con dirección de anime en pixel art, generadas íntegramente p
 ## Escenas
 | Escena | Formato | Qué estrena |
 |---|---|---|
+| [Otra Vez · Ep. 2](escenas/otra-vez-ep2/) | Short vertical 9:16, loop perfecto de 8,4 s | Motor compartido, física de pelo y ropa, finta con disolución, viento, derrape |
 | [Otra Vez](escenas/otra-vez/) | Short vertical 9:16, loop perfecto de 7,6 s | Gancho de apertura, ataque en picada, loop sin costura, lluvia |
 | [Kessen 16-bit](escenas/kessen-16bit/) | 16:9, 10,4 s | Timing mixto, hit-stop, corte a los pies, sonido sintetizado |
 | [Kessen (siluetas)](escenas/archivo/kessen-siluetas/) | 16:9, 10 s | Primera coreografía, impact frames |

@@ -15,14 +15,18 @@ Escenas de acción con dirección de anime (sakuga) en pixel art generado por c�
 - Regla 1 + 1: cada escena nueva estrena una técnica y un gancho para el espectador.
 
 ## Estructura
+- `engine/sakuga.js`: motor compartido (primitivas, cámara, poses, física Verlet, efectos, sonido, runtime). Las escenas nuevas se construyen sobre él.
+- `tools/bundle.py`: inlinea el motor y deja una escena en un único HTML para compartirla.
 - `guia/`: la guía viva de la técnica.
 - `escenas/<nombre>/index.html`: una escena por carpeta, abrible directo en el navegador o con GitHub Pages.
 - `escenas/archivo/`: versiones anteriores, como historial del estilo.
+- `escenas/otra-vez/` y `escenas/kessen-16bit/` son anteriores al motor y siguen siendo autocontenidas. No migrarlas salvo que se pida.
 
 ## Cómo verificar una escena
 Abrirla con Playwright, pausar, llamar `window.__seek(t)` en 6 a 12 momentos clave, sacar capturas y armar una grilla para revisarla de un vistazo. Una sola pasada de correcciones por revisión.
 
 ## Próximos pasos
-1. Extraer el motor compartido a `engine/` (primitivas, cámara, rig, efectos, sonido) para que cada escena sea solo un timeline de datos.
-2. Física secundaria (Verlet) para pelo, bufanda y abrigo.
-3. "Otra Vez · Ep. 2" sobre el motor nuevo.
+1. Arcos entre poses (interpolar por curvas en vez de líneas rectas) y smears que estiren el cuerpo.
+2. Cinemática inversa para clavar los pies durante los derrapes.
+3. Iluminación por píxel: que la energía tiña el cuerpo según la distancia.
+4. "Otra Vez · Ep. 3".

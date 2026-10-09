@@ -134,3 +134,44 @@ Se activa con un botón, porque los navegadores exigen un gesto del usuario. Pas
 - [ ] Funciona a 400 px de ancho; el stage tiene el aspecto correcto (16:9, 4:5 o 9:16).
 - [ ] `prefers-reduced-motion` arranca en pausa en un frame lindo.
 - [ ] Revisión visual con capturas en momentos clave vía `__seek(t)`.
+
+---
+
+## 8. El motor (`engine/sakuga.js`) — desde el Ep. 2
+
+Una escena ya no copia código: carga el motor y define solo **personajes + `state(t)` puro + `render(s)`**.
+
+```js
+Sakuga.start({
+  loop, vertical, camCy, reducedT,
+  chars:{id:{head:'hood'|'hair', pal:{…}, chains:[…]}},
+  light:{x, rim},               // de qué lado cae el borde de luz
+  state(t) → {phase, cam:{zoom,camX,camY,shake}, chars:[{id,pose,x,y,dir,rot,…}], freeze?},
+  wind(t) → [wx,wy],            // empuja las cadenas físicas
+  render(s), post(s),           // dibujo de la escena (post va encima de todo: lluvia, viento)
+  sfx:[[t,fn]], drone(s), ambience(s)→{rain,wind,windFreq}, crackle(s),
+  subs, hook, el:{stage,canvas,toggle,sound,sub,hook}
+})
+```
+
+- **`state(t)` tiene que ser pura**: depende solo de `t`. El motor la llama muchas veces por frame para la física.
+- **`freeze`** en el state = hit-stop: el motor congela el tiempo mientras dibuja.
+- **Empaquetar para compartir:** `python3 tools/bundle.py escenas/X/index.html salida.html` inlinea el motor en un único HTML.
+
+### Física secundaria determinista (Verlet)
+- Cada personaje declara cadenas: `{key, anchor:'head'|'chest'|'hip', off, n, len, w:[inicio,fin], col, tip, tipFrom, grav, wind, when}`.
+- **Truco clave:** para dibujar el instante T, se re-simula desde T−0,8 s con paso fijo de 1/60, leyendo `state()` en cada subpaso. Se obtiene física real (inercia, latigazo, viento) que igual es **reproducible**: funciona con seek, con pausa y con loops.
+- La física también va en twos: se simula al instante cuantizado a 12 fps y se cachea.
+- Si el ancla salta más de 70 unidades entre subpasos (un corte de plano), la cadena se reinicia, para que no se estire como un elástico.
+- El abrigo, la bufanda, la coleta y la trenza son cadenas. La diferencia con las poses rígidas se nota al instante: es el mayor salto de calidad desde el pixel art.
+
+### Recursos nuevos del Ep. 2
+- **Finta con disolución:** el personaje se dibuja en una capa aparte y se perfora con Bayer (`Sakuga.dissolve(level, fn)`). El puño la atraviesa y ella desaparece en píxeles.
+- **Ataque en picada:** las speed lines pasan a vertical (`speedLines(π/2)`) y la cámara inclina hacia arriba.
+- **Derrape:** chispas que salen de los pies hacia atrás (`skidSparks`) más un sonido de raspado (bandpass agudo y lowpass grave).
+- **Viento visible:** trazos horizontales tenues, lluvia inclinada (`rain(.6)`), un ambiente de viento con un bandpass que sigue la ráfaga y cadenas que flamean.
+- **Revelación de diseño:** que se le caiga la capucha y aparezca la trenza genera un gancho de personaje sin tener que dibujar una cara.
+
+### Gancho de serie
+- El Ep. 2 abre con los ojos *de ella* y "ESTA VEZ NO", que contesta el "Otra vez" del Ep. 1, y cierra con "—Ahora sí.".
+- Cada episodio es un loop perfecto por sí solo, pero la serie avanza. Funciona como teaser del siguiente.
