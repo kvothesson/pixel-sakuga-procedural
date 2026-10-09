@@ -19,7 +19,7 @@ html,body{background:var(--night);color:var(--ink);margin:0}
 body{font-family:var(--f-pixel);padding-inline:16px;padding-block:16px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
 .stage{position:relative;width:min(100%,calc(82vh * 9 / 16));aspect-ratio:9/16;max-width:100%;overflow:hidden;background:#000;cursor:pointer;border-radius:10px;box-shadow:0 0 0 2px #10261c}
 canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
-.hook{position:absolute;top:13%;left:0;right:0;text-align:center;pointer-events:none;font-size:clamp(18px,6vw,30px);letter-spacing:.06em;color:#fff;
+.hook{position:absolute;top:46%;left:0;right:0;text-align:center;pointer-events:none;font-size:clamp(18px,6vw,30px);letter-spacing:.06em;color:#fff;
   text-shadow:3px 0 #0f6a3a,-3px 0 #000,0 3px #000,0 -3px #000}
 .hook small{display:block;font-size:.5em;color:#ffd84a;letter-spacing:.2em;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000}
 .sub{position:absolute;left:50%;bottom:17%;transform:translateX(-50%);width:92%;text-align:center;pointer-events:none;
@@ -33,7 +33,7 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 </style>
 </head><body>
 <div class="stage" id="stage">
-  <canvas id="c" aria-label="Episodio completo en pixel art 3D: el eco de Midori sale del charco y lo enfrenta"></canvas>
+  <canvas id="c" aria-label="Episodio completo en pixel art 3D: el reflejo de Midori sale del charco y devuelve todo lo que le hacen, con medio segundo de atraso"></canvas>
   <div class="hook" id="hook"></div>
   <div class="sub" id="sub"></div>
 </div>
@@ -49,7 +49,7 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 <script>
 (()=>{
 const S=window.Sakuga,{P,lerp,ease,easeIn,easeOut,clamp,segAt,lerpPose,q8,q12,q24}=S;
-const ANIMATIC=true; // etapa 1: muestra el nombre de cada plano
+const ANIMATIC=true; // muestra el número y nombre de cada plano (se apaga al exportar)
 
 // ---------- personajes (sin faldón suelto: el abrigo largo es parte del torso) ----------
 const BLUE={head:'hood',pal:{coat:'#2a3270',coatD:'#1a1f48',pants:'#1e2244',pantsD:'#151834',boot:'#0c0d1c',skin:'#f0c4a0',glove:'#d8e8ff',hood:'#1f2858',hair:'#2a3060',tip:'#4fb4ff',aura:'#4fb4ff',dark:'#1f5fa8'},
@@ -63,109 +63,180 @@ const SHADE={head:'hair',pal:{coat:'#0a0810',coatD:'#06040a',pants:'#08060c',pan
 const ECHO={head:'hood',pal:{coat:'#0a0810',coatD:'#06040a',pants:'#08060c',pantsD:'#050308',boot:'#030206',skin:'#08060c',neck:'#08060c',glove:'#cfc8e8',hood:'#0a0810',hair:'#0a0810',aura:'#e8e0ff',dark:'#000'},
   chains:[{key:'cape',anchor:'chest',off:[-4,-2,0],n:7,len:9,w:[13,8],col:'coatD',grav:1.3,wind:.5,damp:.92}]};
 
-// ---------- guion: 21 planos medidos en beats (120 bpm → 1 beat = 0,5 s) ----------
-const POS={red:[-40,30],blue:[-62,-12],green:[30,12]},PUD=[0,0];
+// =====================================================================
+// LA REGLA: el eco es el reflejo de Midori. Copia lo que él hace y DEVUELVE
+// todo lo que le hacen, medio segundo después. Si Midori no se mueve, el eco tampoco.
+// GEOGRAFÍA (regla de 180°): héroes siempre a la izquierda, charco y eco a la derecha;
+// la cámara nunca cruza al otro lado (yaw entre −0,5 y 0,4).
+// =====================================================================
+const DELAY=.5,PUD=[0,0,28],PRX=58,PRZ=38,EX=14,EZ=8;
+const POS={red:[-64,16],blue:[-80,-14],green:[-26,0]};
+const RAISE={...P.stance,rE:[12,-90],rH:[16,-114]},HOLD={...P.stance,lE:[-4,-74],lH:[8,-80],rE:[14,-74],rH:[4,-82]};
 const toward=(x,z,tx,tz)=>Math.atan2(tz-z,tx-x);
-const hero=(id,o={})=>({id,x:POS[id][0],z:POS[id][1],yaw:toward(POS[id][0],POS[id][1],...PUD),pose:P.stance,hoodDown:true,...o});
-const echo=o=>({id:'echo',x:PUD[0],z:PUD[1],yaw:Math.PI/2,pose:P.stance,...o});
-const LOOK={echo:{frame:'#05030a',edge:'#e8e0ff',rim:'#e8e0ff',iris:['#cfc8e8','#ffffff'],bangs:false,flare:'#ffffff'},
-  green:{frame:'#184232',edge:'#5bff9e',rim:'#ff5a6a',iris:['#1fae5c','#8affb8'],bangs:false,flare:'#d0ffe4'}};
+const hero=(id,o={})=>({id,x:POS[id][0],z:POS[id][1],yaw:toward(POS[id][0],POS[id][1],PUD[0],PUD[2]),pose:P.stance,hoodDown:true,...o});
+const midori=o=>({id:'green',x:POS.green[0],z:POS.green[1],yaw:0,pose:P.stance,...o});
+const echo=o=>({id:'echo',x:EX,z:EZ,yaw:Math.PI,pose:P.stance,...o});
+const blink=(t,...at)=>{let o=1;for(const a of at)if(t>=a&&t<a+.2)o=Math.min(o,Math.abs(Math.cos(Math.PI*(t-a)/.2)));return o};
+const LOOK={green:{frame:'#184232',edge:'#5bff9e',rim:'#ff5a6a',iris:['#1fae5c','#8affb8'],bangs:false,flare:'#d0ffe4'},
+  echo:{frame:'#0a0810',edge:'#e8e0ff',rim:'#e8e0ff',iris:['#cfc8e8','#ffffff'],bangs:false,flare:'#ffffff'},
+  red:{frame:'#2a0c18',edge:'#ff2e45',rim:'#ff5a6a',iris:['#c41a34','#ff6a7a'],bangs:true,flare:'#ffc8d0'},
+  blue:{frame:'#2a3060',edge:'#4fb4ff',rim:'#ff5a6a',iris:['#2a7ad8','#6ec8ff'],bangs:true,flare:'#c8ecff'}};
+const CAM={wide:{yaw:-.22,pitch:.3,ty:-42,tx:-24,D:420,zoom:.95},pudd:{yaw:.3,pitch:.03,ty:-58,tx:-24,tz:2,D:200,zoom:1.25,cy:.36},
+  side:{yaw:0,pitch:.1,ty:-60,tx:-26,D:330,zoom:1.08}};
+
+// ---------- guion: 19 planos, 120 beats a 120 bpm = 60 s ----------
 const SEQ=S.sequence([
-  // PARTE 1 — gancho
-  {id:'ojos',beats:4,phase:'EYES',state:(lt,k)=>({eyes:ease(clamp(k*2.2)),label:'1 · ojos blancos — "OTRA VEZ"'})},
-  {id:'azotea',beats:6,state:(lt,k)=>({chars:[hero('red'),hero('blue'),hero('green')],cam3:{yaw:lerp(-.5,-.3,k),pitch:.2,ty:-45,D:420,zoom:.95},label:'2 · azotea, lluvia, los tres'})},
-  // PARTE 2 — el eco
-  {id:'midori_mira',beats:4,state:(lt,k)=>({chars:[hero('green',{pose:P.stance})],cam3:{yaw:.9,pitch:-.18,ty:-80,tx:30,tz:12,D:160,zoom:1.9},label:'3 · Midori mira el charco'})},
-  {id:'reflejo',beats:4,state:(lt,k)=>({chars:[hero('green')],cam3:{yaw:.2,pitch:.95,ty:-10,tx:10,tz:5,D:260,zoom:1.6},reflectOnly:1,label:'4 · el reflejo no lo imita'})},
-  {id:'eco_sale',beats:8,state:(lt,k)=>({chars:[hero('red'),hero('blue'),hero('green'),echo({y:lerp(120,0,easeOut(clamp(k*1.3))),rising:k<.77})],cam3:{yaw:lerp(-.2,.2,k),pitch:.15,ty:-55,D:380,zoom:1.05,shake:2},label:'5 · el eco sale del charco'})},
-  {id:'cutin_eco',beats:4,phase:'CUT',state:(lt,k)=>({chars:[echo()],cam3:{yaw:0,pitch:0,ty:-70,D:260,zoom:1.3},cut:{look:LOOK.echo,name:'残響 ECO',sub:'LA SOMBRA DE MIDORI',col:'#e8e0ff',k},label:'6 · cut-in del ECO'})},
-  // PARTE 3 — la pelea
-  {id:'carrera',beats:6,state:(lt,k)=>{const cs=['red','blue','green'].map(id=>{const[x0,z0]=POS[id],yw=toward(x0,z0,...PUD),g=S.gait3(lt*90,{x0,z0,yaw:yw,stride:92,lift:16,lead:.33,bob:3});
-      return{id,x:g.x,z:g.z,y:g.y,yaw:yw,plant3:g.plant3,pose:lerpPose(P.runA,P.runB,g.swing),hoodDown:true}});return{chars:cs.concat([echo({pose:P.charge})]),cam3:{yaw:-.6,pitch:.12,ty:-50,tx:-20,D:300,zoom:1.15},label:'7 · los tres corren'}}},
-  {id:'golpe_kurenai',beats:4,state:(lt,k)=>({chars:[{id:'red',x:-50,z:0,yaw:0,pose:S.keyPose(lt,[[0,P.crouch],[.5,P.strike]])},echo({x:20,yaw:Math.PI,pose:lt<.5?P.stance:P.parry})],cam3:{yaw:.15,pitch:.05,ty:-60,tx:-15,D:220,zoom:1.3},freeze:lt>=.5&&lt<.56?.5:undefined,spark:lt>=.5&&lt<.7?[12,-74,0]:null,label:'8 · golpe de Kurenai (un plano)'})},
-  {id:'golpe_aoi',beats:4,state:(lt,k)=>({chars:[{id:'blue',x:-10,z:0,yaw:0,hoodDown:true,pose:S.keyPose(lt,[[0,P.crouch],[.5,P.upper]])},echo({x:22,yaw:Math.PI,pose:lt<.5?P.stance:P.lean})],cam3:{yaw:-.4,pitch:-.25,ty:-80,D:200,zoom:1.3},freeze:lt>=.5&&lt<.56?.5:undefined,spark:lt>=.5&&lt<.7?[20,-110,0]:null,label:'9 · golpe de Aoi (contrapicado)'})},
-  {id:'puno_camara',beats:6,state:(lt,k)=>({chars:[echo({yaw:Math.PI/2*.86,pose:S.keyPose(lt,[[0,P.stance],[1.6,P.crouch],[2.2,P.strike]])})],cam3:{yaw:.12,pitch:-.04,ty:-70,D:118,zoom:2.2,shake:lt>2.2?6:0},crack:lt>2.3?clamp((lt-2.3)/.4):0,label:'10 · puño a cámara + vidrio'})},
-  {id:'tiempo',beats:8,state:(lt,k)=>({chars:[echo({x:-28,yaw:0,pose:P.parry}),{id:'green',x:30,z:0,yaw:Math.PI,pose:P.kick}],freeze:.01,cam3:{yaw:.4+Math.PI*1.5*ease(k),pitch:.1,ty:-66,D:280,zoom:1.35},spark:[2,-80,0],label:'11 · tiempo congelado, la cámara gira'})},
-  {id:'derriba',beats:6,state:(lt,k)=>{const sp=lt<.8;return{chars:[echo({pose:sp?P.kick:P.stance,yaw:sp?(Math.floor(lt*6)%2?0:Math.PI):Math.PI/2}),
-      {id:'red',x:lerp(-30,-110,easeOut(clamp(lt/.7))),z:20,yaw:0,pose:lt<.7?P.tuck:P.after},{id:'blue',x:lerp(30,110,easeOut(clamp(lt/.7))),z:-20,yaw:Math.PI,hoodDown:true,pose:lt<.7?P.tuck:P.after}],
-      cam3:{yaw:0,pitch:.3,ty:-50,D:360,zoom:.95,shake:lt<.4?6:0},label:'12 · el eco gira y los derriba'}}},
-  {id:'solo',beats:6,state:(lt,k)=>({chars:[{id:'green',x:-45,z:0,yaw:0,pose:P.stance},echo({x:45,yaw:Math.PI})],cam3:{yaw:0,pitch:.08,ty:-60,D:340,zoom:lerp(.9,1.05,k)},label:'13 · Midori queda solo (silencio)'})},
-  {id:'es_mio',beats:4,phase:'CUT',state:(lt,k)=>({chars:[{id:'green',x:-45,z:0,yaw:0,pose:P.stance},echo({x:45,yaw:Math.PI})],cam3:{yaw:0,pitch:.08,ty:-60,D:340,zoom:1.05},cut:{look:LOOK.green,name:'翠 MIDORI',sub:'—ES MÍO.',col:'#5bff9e',k},label:'14 · "Es mío."'})},
-  {id:'carga',beats:6,state:(lt,k)=>({chars:[{id:'green',x:-45,z:0,yaw:0,pose:S.keyPose(lt,[[0,P.stance],[.3,P.charge]])},echo({x:45,yaw:Math.PI,pose:S.keyPose(lt,[[0,P.stance],[.5,P.charge]])})],orbs:k,cam3:{yaw:lerp(-.3,.3,k),pitch:.05,ty:-65,D:300,zoom:1.15},label:'15 · cargan energía'})},
-  // PARTE 4 — clímax
-  {id:'espejo',beats:8,state:(lt,k)=>({chars:[{id:'green',x:-30,z:0,yaw:0,pose:P.charge},echo({x:30,yaw:Math.PI,pose:P.charge})],cam3:{yaw:0,pitch:-.05,ty:-20,D:260,zoom:1.15},orbs:1,label:'16 · espejo sobre el charco'})},
-  {id:'simultaneo',beats:4,state:(lt,k)=>({chars:[{id:'green',x:lerp(-30,-28-62,0)+0,z:0,yaw:0,pose:S.keyPose(lt,[[0,P.crouch],[.6,P.strike]])},echo({x:30,yaw:Math.PI,pose:S.keyPose(lt,[[0,P.crouch],[.6,P.strike]])})],freeze:lt>=.6&&lt<.75?.6:undefined,spark:lt>=.6?[2,-74,0]:null,cam3:{yaw:0,pitch:.02,ty:-70,D:200,zoom:1.5,shake:lt>.6?6:0},label:'17 · golpe simultáneo'})},
-  {id:'impacto',beats:4,phase:'IMPACT',state:(lt,k)=>({chars:[{id:'green',x:-30,z:0,yaw:0,pose:P.strike},echo({x:30,yaw:Math.PI,pose:P.strike})],cam3:{yaw:0,pitch:.02,ty:-70,D:200,zoom:1.5},label:'18 · impact frames'})},
-  {id:'reflejo_roto',beats:8,state:(lt,k)=>({chars:[{id:'green',x:-30,z:0,yaw:0,pose:P.kneel},echo({x:30,yaw:Math.PI,pose:P.kneel,dissolve:1-clamp(k*1.4)})],cam3:{yaw:.2,pitch:.6,ty:-30,D:300,zoom:1.05},crack:clamp(k*2),label:'19 · el reflejo se rompe'})},
-  // PARTE 5 — amanecer
-  {id:'amanecer',beats:8,state:(lt,k)=>({dawn:ease(k),chars:[hero('red',{pose:P.stance}),hero('blue'),{id:'green',x:-10,z:0,yaw:Math.PI/2,pose:P.stance}],cam3:{yaw:lerp(.3,.1,k),pitch:.12,ty:-55,D:380,zoom:1},label:'20 · amanece'})},
-  {id:'final',beats:8,phase:'END',state:(lt,k)=>({dawn:1,chars:[hero('red'),hero('blue'),{id:'green',x:-10,z:0,yaw:Math.PI/2,pose:P.stance}],cam3:{yaw:.1,pitch:.12,ty:-55,D:380,zoom:1},black:k>.55,eyes:k>.6?1-ease(clamp((k-.8)/.15)):0,label:'21 · "Otra vez no." + ojos'})}
+ // 1 — GANCHO
+ {id:'gancho',beats:10,phase:'SPLIT',info:['Gancho','Primer plano partido: arriba los ojos de Midori, abajo su reflejo en el charco. Él parpadea; el reflejo parpadea medio segundo tarde. Dos veces.','Plano fijo, pantalla partida por la línea del agua.','Lluvia, pad grave. Texto: "TU REFLEJO PARPADEÓ TARDE".'],
+  state:lt=>({split:[blink(lt,1.2,3.0),blink(lt,1.2+DELAY,3.0+DELAY)],label:'1 · gancho'})},
+ // 2 — LA REGLA
+ {id:'azotea',beats:8,info:['La azotea','Plano general: los tres en la azotea, el charco adelante de Midori.','General alto, de la izquierda (establece la geografía).','Lluvia, pad, hi-hat suave.'],
+  state:(lt,k)=>({chars:[hero('red'),hero('blue'),midori()],refl:{pose:P.stance},cam3:{...CAM.wide,yaw:lerp(-.3,-.18,k)},label:'2 · la azotea'})},
+ {id:'mano',beats:8,info:['La regla','Midori levanta la mano. El reflejo la levanta medio segundo después. La baja; el reflejo la baja tarde.','Medio, bajo, con el charco en primer término.','Pad. Un "tic" agudo cuando el reflejo copia.'],
+  state:lt=>{const pm=t=>S.keyPose(t,[[0,P.stance],[.8,RAISE],[2.6,P.stance]]);return{chars:[midori({pose:pm(lt)})],refl:{pose:pm(lt-DELAY)},near:1,cam3:CAM.pudd,label:'3 · la regla'}}},
+ {id:'miran',beats:4,info:['Lo ven','Kurenai y Aoi giran la cabeza hacia Midori: lo vieron.','Medio corto de los dos.','"—¿Viste eso?"'],
+  state:lt=>({chars:[hero('red',{yaw:lt<.4?-.6:toward(-64,16,-26,0)}),hero('blue',{yaw:lt<.55?-.6:toward(-80,-14,-26,0)})],cam3:{yaw:-.45,pitch:.08,ty:-66,tx:-72,tz:0,D:190,zoom:1.7},label:'4 · lo ven'})},
+ // 3 — SALE
+ {id:'sigue',beats:4,info:['Sigue solo','Midori está quieto. Su reflejo no: gira la cara hacia nosotros.','El mismo encuadre que el plano 3 (para comparar).','Silencio, un latido.'],
+  state:lt=>({chars:[midori()],refl:{pose:RAISE,yaw:lerp(0,Math.PI/2,ease(clamp(lt/1.2)))},near:1,cam3:CAM.pudd,label:'5 · sigue solo'})},
+ {id:'sale',beats:10,info:['Sale','El reflejo sale del charco: una copia negra de Midori, de ojos blancos. Midori retrocede un paso.','General bajo de costado; tiembla.','Burbujeo grave que sube; entra el bajo.'],
+  state:lt=>({chars:[hero('red'),hero('blue'),midori({x:lerp(-26,-38,ease(clamp((lt-2.4)/.6))),pose:lt>2.4&&lt<3.2?P.crouch:P.stance}),echo({y:lerp(120,0,easeOut(clamp(lt/2.6))),rising:lt<2.6})],
+    cam3:{...CAM.side,pitch:.06,zoom:1.02,shake:lt<2.6?2:0},label:'6 · sale'})},
+ {id:'cut_eco',beats:4,phase:'CUT',info:['El eco','Cut-in del eco con su nombre.','Franja diagonal sobre el plano del eco.','Platillo + franja que entra.'],
+  state:(lt,k)=>({chars:[echo()],cam3:{yaw:-.15,pitch:.04,ty:-70,tx:10,D:230,zoom:1.35},cut:{look:LOOK.echo,name:'残響 ECO',sub:'EL QUE LLEGA TARDE',col:'#e8e0ff',k},label:'7 · el eco'})},
+ // 4 — ESCALADA
+ {id:'kurenai',beats:6,info:['Kurenai ataca','Kurenai corre y le pega. El golpe entra, el eco ondula como agua y no se mueve. Medio segundo después le devuelve el MISMO golpe y la manda a volar.','General de costado (los dos en cuadro, de izquierda a derecha).','Batería completa. Golpe "tap" + ondas; el devuelto, más fuerte.'],
+  state:lt=>{const red={id:'red',x:-64,z:0,yaw:0,pose:P.stance};
+    if(lt<1)Object.assign(red,(g=>({x:g.x,z:g.z,y:g.y,plant3:g.plant3,pose:lerpPose(P.runA,P.runB,g.swing)}))(S.gait3(lt*21,{x0:-64,z0:0,yaw:0,stride:92,lift:16,lead:.33,bob:3})));
+    else if(lt<1.7){red.x=-43;red.pose=S.keyPose(lt,[[1,P.crouch],[1.2,P.strike]])}
+    else{const k=clamp((lt-1.75)/.6);red.x=lerp(-43,-108,easeOut(k));red.y=-Math.sin(Math.PI*k)*24;red.pose=k<1?P.tuck:P.after}
+    const ep=S.keyPose(lt,[[0,P.stance],[1+DELAY,P.crouch],[1.2+DELAY,P.strike],[2.4,P.stance]]);
+    return{chars:[red,echo({pose:ep})],cam3:CAM.side,ripple:lt>=1.2&&lt<1.7?lt-1.2:null,spark:lt>=1.7&&lt<1.9?[-15,-74,0]:null,freeze:lt>=1.7&&lt<1.76?1.7:undefined,label:'8 · Kurenai ataca'}}},
+ {id:'devolvio',beats:4,info:['Lo devolvió','Kurenai en el piso, mira al eco: "¡Me lo devolvió!".','Medio desde atrás de Kurenai, el eco al fondo.','Bajo y hi-hat.'],
+  state:lt=>({chars:[{id:'red',x:-60,z:6,yaw:0,pose:P.kneel},echo()],cam3:{yaw:-.3,pitch:.1,ty:-50,tx:-40,tz:4,D:200,zoom:1.4},label:'9 · lo devolvió'})},
+ {id:'aoi',beats:4,info:['Aoi dispara','Aoi carga y dispara un rayo azul al eco.','Medio de Aoi, rayo saliendo hacia la derecha.','Carga ascendente + rayo.'],
+  state:lt=>{const a={id:'blue',x:-70,z:-6,yaw:0,hoodDown:true,pose:S.keyPose(lt,[[0,P.crouch],[.3,P.charge],[1,P.fire]])};
+    return{chars:[a,echo()],beam:lt>=1?{from:'blue',k:clamp((lt-1)/.4)}:null,cam3:{yaw:-.25,pitch:.06,ty:-62,tx:-40,tz:-4,D:240,zoom:1.3},label:'10 · Aoi dispara'}}},
+ {id:'rayo',beats:8,info:['El rayo vuelve','El rayo entra en el eco, que ondula. Medio segundo después dispara el MISMO rayo de vuelta. Los dos rayos chocan y el choque empuja hacia Aoi.','General de costado.','Choque de rayos zumbando, sube.'],
+  state:lt=>{const a={id:'blue',x:-70,z:-6,yaw:0,hoodDown:true,pose:P.fire},e=echo({pose:S.keyPose(lt,[[0,P.stance],[DELAY,P.charge],[DELAY+.3,P.fire]])});
+    return{chars:[a,e,{id:'red',x:-104,z:14,yaw:0,pose:P.kneel}],beam:{from:'blue',k:1,clash:lt>=DELAY+.3?lerp(EX-20,-40,easeIn(clamp((lt-.8)/3))):null},ripple:lt<DELAY+.3?lt:null,cam3:CAM.side,label:'11 · el rayo vuelve'}}},
+ {id:'cae',beats:4,info:['Cae Aoi','El choque le explota encima a Aoi y cae al lado de Kurenai.','General de costado; destello blanco.','Explosión; corta la batería.'],
+  state:lt=>{const k=clamp(lt/.6);return{chars:[{id:'blue',x:lerp(-70,-96,easeOut(k)),z:-6,y:-Math.sin(Math.PI*k)*20,yaw:0,hoodDown:true,pose:k<1?P.tuck:P.kneel},echo(),{id:'red',x:-104,z:14,yaw:0,pose:P.kneel}],
+    flash:1-clamp(lt/.4),cam3:{...CAM.side,shake:lt<.4?6:0},label:'12 · cae Aoi'}}},
+ // 5 — EL GIRO
+ {id:'entiende',beats:6,phase:'SPLIT',info:['Entiende','Primer plano partido otra vez: Midori y su reflejo, ahora en sincronía. Midori entiende.','Igual al gancho (rima visual).','"—Es mi reflejo… Si no me muevo…"'],
+  state:lt=>({split:[1,1],label:'13 · entiende'})},
+ {id:'quieto',beats:8,info:['Quieto','Midori se para frente al eco y se congela con los brazos en guardia. El eco lo copia medio segundo tarde… y también se congela. Atrás, Kurenai y Aoi se levantan.','General de costado; nada se mueve salvo la lluvia.','Silencio total, solo lluvia y un latido.'],
+  state:lt=>{const g=midori({x:-30,z:-34,pose:S.keyPose(lt,[[0,P.stance],[.6,HOLD]])}),e=echo({pose:S.keyPose(lt,[[0,P.stance],[.6+DELAY,HOLD]])});
+    const up=t=>S.keyPose(lt,[[0,P.kneel],[t,P.crouch],[t+.4,P.stance]]);
+    return{chars:[g,e,{id:'red',x:-84,z:18,yaw:0,pose:up(2.2)},{id:'blue',x:-90,z:-12,yaw:0,hoodDown:true,pose:up(2.6)}],cam3:{...CAM.side,pitch:.16,zoom:1.02},label:'14 · quieto'}}},
+ {id:'ahora',beats:4,phase:'CUT2',info:['¡Ahora!','Cut-in doble: Kurenai y Aoi.','Dos franjas cruzadas sobre el eco congelado.','Platillo; vuelve la batería.'],
+  state:(lt,k)=>({chars:[midori({x:-30,z:-34,pose:HOLD}),echo({pose:HOLD})],cam3:{...CAM.side,pitch:.16,zoom:1.02},cut2:k,label:'15 · ¡ahora!'})},
+ // 6 — CLÍMAX
+ {id:'golpe',beats:4,info:['Golpe doble','Kurenai y Aoi le pegan a la vez desde los dos lados. El eco está congelado copiando a Midori: no puede devolver nada.','General de costado: uno entra por cada lado.','Golpe doble + impact frames.'],
+  state:lt=>{if(lt>=.7)return{phase:'IMPACT',chars:[{id:'red',x:EX-42,z:EZ,yaw:0,pose:P.strike},{id:'blue',x:EX+42,z:EZ,yaw:Math.PI,hoodDown:true,pose:P.strike},echo({pose:HOLD})],cam3:{yaw:0,pitch:.12,ty:-62,tx:EX-6,tz:EZ,D:300,zoom:1.08},label:'16 · golpe doble'};
+    const k=clamp(lt/.6),pr=S.keyPose(lt,[[0,P.crouch],[.55,P.strike]]);
+    return{chars:[midori({x:-30,z:-34,pose:HOLD}),{id:'red',x:lerp(EX-110,EX-42,easeIn(k)),z:EZ,yaw:0,pose:pr},{id:'blue',x:lerp(EX+110,EX+42,easeIn(k)),z:EZ,yaw:Math.PI,hoodDown:true,pose:pr},echo({pose:HOLD})],
+      cam3:{yaw:0,pitch:.12,ty:-62,tx:EX-6,tz:EZ,D:300,zoom:1.08},freeze:lt>=.6&&lt<.7?.6:undefined,label:'16 · golpe doble'}}},
+ {id:'rompe',beats:8,info:['Se rompe','El eco se agrieta como la superficie del agua, se deshace y vuelve al charco.','Medio bajo, de frente al eco.','Vidrio que se quiebra + ondas que se apagan.'],
+  state:lt=>({chars:[midori({x:-30,z:-34,pose:lt<1?HOLD:P.stance}),echo({pose:HOLD,dissolve:1-clamp((lt-1.2)/1.6),y:lt>2.6?lerp(0,110,easeIn(clamp((lt-2.6)/1.2))):0,rising:lt>2.6})],
+    crack:clamp(lt/.6),cam3:{yaw:-.1,pitch:.2,ty:-55,tx:0,D:250,zoom:1.3},label:'17 · se rompe'})},
+ // 7 — CIERRE Y LOOP
+ {id:'calma',beats:6,info:['Calma','Midori levanta la mano otra vez. Su reflejo la levanta al mismo tiempo. Respira.','El mismo encuadre que el plano 3 (cierra la rima).','Pad suave, la batería se fue.'],
+  state:lt=>{const pm=t=>S.keyPose(t,[[0,P.stance],[.6,RAISE],[2.2,P.stance]]);return{chars:[midori({pose:pm(lt)})],refl:{pose:pm(lt)},near:1,cam3:CAM.pudd,label:'18 · calma'}}},
+ {id:'otravez',beats:10,phase:'SPLIT',info:['Otra vez','Primer plano partido. Midori parpadea… y el reflejo parpadea tarde otra vez. Último cuadro = primer cuadro del episodio.','Igual al gancho.','"—…Otra vez." · el loop vuelve al plano 1.'],
+  state:lt=>({split:[blink(lt,1.0),blink(lt,1.0+DELAY)],label:'19 · otra vez'})}
 ],{bpm:120});
-const LOOP=SEQ.total;
+const LOOP=SEQ.total,st=id=>SEQ.start(id);
 const state=t=>SEQ.state(t);
-const wind=t=>[-(160+90*Math.sin(t*1.3)),-40,40];
+const wind=t=>[-(150+90*Math.sin(t*1.3)),-40,30];
 
 // ---------- dibujo ----------
-function eyesDark(open){const{R,PW,PH}=S,sc=Math.max(1,Math.round(PW/45)),cy=Math.round(PH*.5);R(0,0,PW,PH,'#000000');
-  for(const sx of[-1,1]){const cx=Math.round(PW/2+sx*PW*.14),w=11*sc,h=Math.max(1,Math.round(open*3.5*sc));
-    S.ditherEllipse(cx,cy,w*.9,Math.max(2,h*1.4),'#2a2840',.5*open+.15);R(cx-w/2,cy-Math.floor(h/2),w,h,'#f4f0ff');if(open>.5)R(cx-sx*w/4-sc/2,cy-Math.floor(h/2),sc,h,'#9a96c8')}}
+// pantalla partida: arriba los ojos, abajo el reflejo en el agua (espejado, más oscuro y ondulado)
+function split([top,bot]){
+  const{PW,PH}=S,h=Math.floor(PH*.5),f=Math.floor(S.t*12);
+  S.closeup(top,0,LOOK.green,{x:0,y:0,w:PW,h});
+  const lay=S.withLayer(()=>S.closeup(bot,0,LOOK.green,{x:0,y:0,w:PW,h})),L=lay.getImageData(0,0,PW,h).data,b=S.ctx(),M=b.getImageData(0,h,PW,PH-h),m=M.data;
+  for(let y=0;y<PH-h;y++){const sy=Math.min(h-1,Math.round(y*.95)),w=Math.round(Math.sin(y*.45+f*.9)*1.4);
+    for(let x=0;x<PW;x++){const sx=Math.max(0,Math.min(PW-1,x+w)),si=((h-1-sy)*PW+sx)*4,o=(y*PW+x)*4;m[o]=L[si]*.5+6;m[o+1]=L[si+1]*.62+8;m[o+2]=L[si+2]*.8+22;m[o+3]=255}}
+  b.putImageData(M,0,h);S.R(0,h,PW,1,'#8a80b0');
+  const per=LOOP/24;for(let i=0;i<6;i++){const r=((S.t+i*per/6)%per)/per;S.ring(PW*(.15+S.hash(i)*.7),h+(PH-h)*(.25+S.hash(i+4)*.6),r*16,r*4,r<.5?'#6a6090':'#2a2440')}
+}
+// charco: elipse en el piso; el reflejo de Midori (con su propio tiempo) se dibuja SOLO adentro
+function puddlePoly(){const pts=[];for(let i=0;i<28;i++){const a=i/28*Math.PI*2,p=S.proj(PUD[0]+Math.cos(a)*PRX,0,PUD[2]+Math.sin(a)*PRZ);pts.push([p[0],p[1]])}return pts}
+const inPoly=(pts,x,y)=>{let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const[xi,yi]=pts[i],[xj,yj]=pts[j];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c}return c};
+function nearPuddle(g){const[fx,fy]=S.proj(g.x,0,g.z||0),cy=fy+S.PH*.2,rx=S.PW*.62,ry=S.PH*.22,pts=[];
+  for(let i=0;i<32;i++){const a=i/32*Math.PI*2;pts.push([fx+Math.cos(a)*rx,Math.max(fy-1,cy+Math.sin(a)*ry)])}return pts}
+function puddle(s){const g=s.chars.find(c=>c.id==='green'),pts=s.near&&g?nearPuddle(g):puddlePoly();S.poly(pts,'#0b0716');
+  if(s.refl&&g){const ch={...g,pose:s.refl.pose,yaw:s.refl.yaw??g.yaw},lay=S.withLayer(()=>S.figure3(ch,'glow')),L=lay.getImageData(0,0,S.PW,S.PH).data,b=S.ctx(),M=b.getImageData(0,0,S.PW,S.PH),m=M.data,f=Math.floor(S.t*12);
+    const fy=Math.round(S.proj(g.x,0,g.z||0)[1]);
+    for(let y=fy+1;y<S.PH;y++){const sy=2*fy-y;if(sy<0)break;const w=Math.round(Math.sin(y*.7+f*.9)*Math.min(1.5,(y-fy)/6));
+      for(let x=0;x<S.PW;x++){if(!inPoly(pts,x+.5,y+.5))continue;const sx=x+w;if(sx<0||sx>=S.PW)continue;
+      const si=(sy*S.PW+sx)*4;if(!L[si+3])continue;const o=(y*S.PW+x)*4;m[o]=L[si]*.6+4;m[o+1]=L[si+1]*.7+6;m[o+2]=L[si+2]*.85+18}}
+    b.putImageData(M,0,0)}
+  for(let i=0;i<pts.length;i++){const a=pts[i],c=pts[(i+1)%pts.length];S.line(a[0],a[1],c[0],c[1],1,'#4a4070')}
+  const per=LOOP/24;for(let i=0;i<4;i++){const r=((S.t+i*per/4)%per)/per,p=S.proj(PUD[0]+(S.hash(i)-.5)*PRX,0,PUD[2]+(S.hash(i+3)-.5)*PRZ),k=S.cam3.K*p[2];S.ring(p[0],p[1],r*9*k,r*2.5*k,r<.5?'#6a6090':'#2a2440')}
+}
 function drawChar(c){const fy=S.proj(c.x,0,c.z||0)[1],b=S.ctx(),body=()=>{if(c.rising){b.save();b.beginPath();b.rect(0,0,S.PW,Math.round(fy));b.clip();S.figure3(c,'glow');b.restore()}else S.figure3(c,'glow')};
   if(c.dissolve!==undefined&&c.dissolve<1)S.dissolve(c.dissolve,body);else body()}
-const NIGHT=['#04030a','#08061a','#0e0a24','#1a0c26','#2a1024'],DAWN=['#2a3a6a','#4a5a8a','#8a6a8a','#d88a7a','#ffc890'];
-const mix=(a,b,k)=>{const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16),c=i=>Math.round(((pa>>i)&255)*(1-k)+((pb>>i)&255)*k);return'#'+((1<<24)|(c(16)<<16)|(c(8)<<8)|c(0)).toString(16).slice(1)};
 function render(s){
   const{disc,ring,seg}=S,t=S.t;
-  if(s.phase==='EYES'||(s.phase==='END'&&s.black)){eyesDark(s.eyes||0);label(s);return}
-  if(s.phase==='IMPACT'){S.impact3(SEQ.start('impacto'),S.PW/2,S.PH*.45,s.chars,'鏡');S.glassCrack(S.PW/2,S.PH*.45,1);label(s);return}
-  const dk=s.dawn||0;S.sky3(NIGHT.map((c,i)=>dk?mix(c,DAWN[i],dk):c));if(dk<.8)S.moon3(-.2,.16,S.PW*.14);S.skyline3();
-  S.floor3(dk?mix('#150e1e','#3a2a3a',dk):'#150e1e','#2a1e3a',420,40);
+  if(s.split){split(s.split);label(s);return}
+  if(s.phase==='IMPACT'){S.impact3(st('golpe')+.7,...S.proj(EX,-74,EZ).slice(0,2),s.chars,'撃');label(s);return}
+  S.sky3(['#04030a','#08061a','#0e0a24','#1a0c26','#2a1024']);S.moon3(-.25,.15,S.PW*.13);S.skyline3();
+  S.floor3('#150e1e','#2a1e3a',420,40);
+  puddle(s);
   const live=s.chars.filter(c=>!(c.y<0)&&!c.rising&&c.dissolve===undefined);
-  S.reflect3(live,s.reflectOnly?.7:.38);
-  if(!s.reflectOnly){for(const c of live)S.shadow3(c);
-    for(const c of s.chars.slice().sort((a,b)=>S.proj(b.x,-50,b.z||0)[3]-S.proj(a.x,-50,a.z||0)[3]))drawChar(c)}
-  const lights=[];
-  if(s.orbs)for(const c of s.chars){const o=S.w3(c,S.pose3(c).rH),pp=S.proj(...o),r=(2+s.orbs*5)*pp[2]*S.cam3.K,col=c.id==='green'?'#5bff9e':'#e8e0ff';disc(pp[0],pp[1],r+2,col);disc(pp[0],pp[1],r,'#ffffff');lights.push({x:o[0],y:o[1],z:o[2],c:c.id==='green'?[100,255,170]:[230,225,255],r:30+s.orbs*40,i:.4+s.orbs*.5})}
-  if(s.spark){const pp=S.proj(...s.spark),k=pp[2]*S.cam3.K;disc(pp[0],pp[1],7*k,'#ffffff');ring(pp[0],pp[1],14*k,14*k,'#ffffff');lights.push({x:s.spark[0],y:s.spark[1],z:s.spark[2],c:[255,250,240],r:60,i:.8})}
+  S.reflect3(live.filter(c=>!(s.refl&&c.id==='green')),.3);for(const c of live)S.shadow3(c);
+  for(const c of s.chars.slice().sort((a,b)=>S.proj(b.x,-50,b.z||0)[3]-S.proj(a.x,-50,a.z||0)[3]))drawChar(c);
+  const lights=[],E2=s.chars.find(c=>c.id==='echo');
+  if(s.ripple!=null&&E2){const c=S.proj(E2.x,-60,E2.z),k=S.cam3.K*c[2];for(let i=0;i<3;i++){const r=((s.ripple*60+i*12)%36);ring(c[0],c[1],r*k,r*1.5*k,'#e8e0ff')}}
+  if(s.beam){const A=s.chars.find(c=>c.id==='blue'),o=S.w3(A,S.pose3(A).rH),end=s.beam.clash!=null?[s.beam.clash,o[1],o[2]]:[lerp(o[0],E2.x,s.beam.k),o[1],lerp(o[2],E2.z,s.beam.k)];
+    S.beam3(o,end,7,'#4fb4ff','#c8ecff');lights.push({x:o[0],y:o[1],z:o[2],c:[90,190,255],r:40,i:.7});
+    if(s.beam.clash!=null){const eo=S.w3(E2,S.pose3(E2).rH);S.beam3(eo,end,7,'#cfc8e8','#ffffff');const p=S.proj(...end),k=S.cam3.K*p[2];disc(p[0],p[1],(8+Math.sin(t*40)*2)*k,'#ffffff');ring(p[0],p[1],16*k,16*k,'#ffffff');lights.push({x:end[0],y:end[1],z:end[2],c:[255,250,240],r:60,i:.9})}}
+  if(s.spark){const p=S.proj(...s.spark),k=S.cam3.K*p[2];disc(p[0],p[1],7*k,'#ffffff');ring(p[0],p[1],14*k,14*k,'#ffffff');lights.push({x:s.spark[0],y:s.spark[1],z:s.spark[2],c:[255,250,240],r:60,i:.8})}
   S.lightPass(lights);
-  if(s.crack)S.glassCrack(S.PW/2,s.phase==='reflejo_roto'?S.PH*.75:S.PH*.42,s.crack);
-  if(dk<.9)S.rain(.3);
+  if(s.crack&&E2){const c=S.proj(E2.x,-60,E2.z);S.glassCrack(c[0],c[1],s.crack*.5,7)}
+  if(s.flash)S.ditherFill(s.flash,'#ffffff');
+  S.rain(.3);
   if(s.cut)S.cutIn({k:s.cut.k,y:.42,h:.2,slope:-.18,look:s.cut.look,name:s.cut.name,sub:s.cut.sub,col:s.cut.col});
+  if(s.cut2!=null){S.cutIn({k:clamp(s.cut2*1.3),y:.3,h:.15,slope:-.16,look:LOOK.red,name:'紅 KURENAI',sub:'¡AHORA!',col:'#ff2e45'});S.cutIn({k:clamp(s.cut2*1.3-.15),y:.62,h:.15,slope:.16,look:LOOK.blue,name:'蒼 AOI',sub:'¡AHORA!',col:'#4fb4ff',dir:-1})}
   label(s);
 }
-function label(s){if(!ANIMATIC||S.exporting)return;S.R(0,S.PH-12,S.PW,12,'#000000');S.pixText(s.label||s.shot.id,S.PW/2,S.PH-6,8,'#ffd84a')}
+function label(s){if(!ANIMATIC||S.exporting)return;S.R(0,S.PH-11,S.PW,11,'#000000');S.pixText(s.label||s.shot.id,S.PW/2,S.PH-5.5,8,'#ffd84a')}
 
-// ---------- música por sección (La menor; amanecer en Do mayor) ----------
-const AM=[45,41,43,40],PAD_M=[57,60,64],PAD_DAWN=[60,64,67];
-const SECTION={
-  ojos:{pad:PAD_M,level:.7},azotea:{pad:PAD_M,level:.7},midori_mira:{pad:PAD_M,level:.7},reflejo:{pad:PAD_M,hat:1,level:.7},
-  eco_sale:{pad:PAD_M,hat:1,bass:AM,level:.85},cutin_eco:{pad:PAD_M,hat:1,bass:AM,crash:1,crashOnce:0,level:.9},
-  carrera:{kick:2,snare:1,hat:1,bass:AM,arp:[69,72,76,72]},golpe_kurenai:{kick:2,snare:1,hat:1,bass:AM,arp:[69,72,76,72]},golpe_aoi:{kick:2,snare:1,hat:1,bass:AM,arp:[69,72,76,79]},
-  puno_camara:{kick:2,snare:1,hat:1,bass:AM},tiempo:{pad:PAD_M,level:.5},derriba:{kick:2,snare:1,hat:1,bass:AM,crash:1},
-  solo:{pad:PAD_M,level:.45},es_mio:{pad:PAD_M,level:.6},carga:{kick:1,hat:1,bass:AM,arp:[69,72,76,81],level:.9},
-  espejo:{kick:2,snare:1,hat:1,bass:AM,arp:[69,76,72,81],crash:1},simultaneo:{kick:2,snare:1,hat:1,bass:AM},impacto:null,
-  reflejo_roto:{pad:[45,52,57],level:.5},amanecer:{pad:PAD_DAWN,arp:[72,76,79,84],level:.6},final:{pad:PAD_DAWN,level:.4}
-};
+// ---------- música por plano (La menor) ----------
+const AM=[45,41,43,40],PAD=[57,60,64];
+const SECTION={gancho:{pad:PAD,level:.6},azotea:{pad:PAD,hat:1,level:.6},mano:{pad:PAD,level:.6},miran:{pad:PAD,hat:1,level:.6},sigue:null,
+  sale:{pad:PAD,hat:1,bass:AM,level:.85},cut_eco:{pad:PAD,hat:1,bass:AM,crash:1,level:.9},kurenai:{kick:2,snare:1,hat:1,bass:AM,arp:[69,72,76,72]},
+  devolvio:{hat:1,bass:AM,level:.8},aoi:{kick:2,snare:1,hat:1,bass:AM,arp:[69,72,76,79]},rayo:{kick:2,snare:1,hat:1,bass:AM,arp:[69,76,72,81]},cae:{crash:1,level:.8},
+  entiende:{pad:PAD,level:.5},quieto:null,ahora:{kick:2,snare:1,hat:1,bass:AM,crash:1},golpe:{kick:2,snare:1,hat:1,bass:AM},rompe:{pad:[45,52,57],level:.5},
+  calma:{pad:[60,64,67],level:.45},otravez:{pad:PAD,level:.5}};
 const section=t=>SECTION[SEQ.at(((t%LOOP)+LOOP)%LOOP).id];
-const X=S.sfx;
-const sfx=[[SEQ.start('eco_sale'),()=>S.noise(1.6,'lowpass',200,900,.4,1,true)],[SEQ.start('golpe_kurenai')+.5,()=>{X.tap();X.boom()}],[SEQ.start('golpe_aoi')+.5,()=>{X.tap();X.boom()}],
-  [SEQ.start('puno_camara')+2.25,()=>{X.boom();S.noise(.4,'highpass',4000,9000,.5)}],[SEQ.start('derriba'),X.bigBoom],[SEQ.start('simultaneo')+.6,X.bigBoom],[SEQ.start('impacto'),X.boom],
-  [SEQ.start('reflejo_roto'),()=>{for(let i=0;i<8;i++)setTimeout(()=>S.tone(.3,'triangle',2000+Math.random()*3000,1500,.08),i*40)}]];
-const drone=s=>({EYES:.02,IMPACT:0}[s.phase]??(s.freeze!=null?0:.06));
-const ambience=s=>({rain:s.phase==='EYES'||s.dawn>.9?0:.06,wind:.03,windFreq:320});
+const X=S.sfx,tick=()=>S.tone(.08,'sine',1760,1700,.12);
+const sfx=[[st('mano')+.8+DELAY,tick],[st('mano')+2.6+DELAY,tick],[st('sigue')+.3,X.heartbeat],[st('sale'),()=>S.noise(2.4,'lowpass',150,700,.45,1,true)],
+  [st('kurenai')+1.2,X.tap],[st('kurenai')+1.7,()=>{X.tap();X.boom()}],[st('aoi')+.3,()=>X.rise(.6)],[st('aoi')+1,()=>S.noise(.5,'bandpass',600,2400,.5,1.2)],
+  [st('rayo')+.8,()=>S.noise(2.5,'bandpass',500,1500,.35,2,true)],[st('cae'),X.bigBoom],[st('quieto')+1,X.heartbeat],[st('quieto')+2.4,X.heartbeat],
+  [st('golpe')+.6,()=>{X.tap();X.boom()}],[st('rompe')+.1,()=>{for(let i=0;i<8;i++)setTimeout(()=>S.tone(.3,'triangle',2000+Math.random()*3000,1500,.08),i*40)}],
+  [st('calma')+.6,tick],[st('otravez')+1+DELAY,tick]];
+const drone=s=>s.freeze!=null||s.phase==='IMPACT'||s.shot.id==='quieto'||s.shot.id==='sigue'?0:.05;
+const ambience=s=>({rain:.06,wind:.03,windFreq:320});
 
 S.start({
-  loop:LOOP,vertical:true,reducedT:SEQ.start('tiempo')+1,no2dSmears:true,
+  loop:LOOP,vertical:true,reducedT:st('quieto')+2,no2dSmears:true,
   chars:{blue:BLUE,red:RED,green:GREEN,echo:ECHO},
   state,wind,render,sfx,drone,ambience,
   onAudio:(prev,cur)=>S.musicTick(prev,cur,SEQ.bpm,section),
   setCam:s=>S.setCam3(s.cam3||{}),simulate:T=>S.simulate3(T),
-  subs:[[SEQ.start('final')+.3,SEQ.start('final')+2.1,'—Otra vez no.','二度とない']],
-  hook:[[0,1.8,'OTRA VEZ','また']],hookShadow:'#2a2840',
+  subs:[[st('miran')+.2,st('sigue'),'—¿Viste eso?','見たか'],[st('devolvio')+.2,st('aoi'),'—¡Me lo devolvió!','返された'],
+    [st('entiende')+.2,st('quieto'),'—Es mi reflejo… Si no me muevo…','俺の影だ'],[st('otravez')+1.9,st('otravez')+4.6,'—…Otra vez.','またか']],
+  hook:[[0,3.2,'TU REFLEJO PARPADEÓ TARDE','影が遅れた']],hookShadow:'#0f6a3a',hookY:.5,
   el:{stage:document.getElementById('stage'),canvas:document.getElementById('c'),toggle:document.getElementById('toggle'),
       sound:document.getElementById('sound'),sub:document.getElementById('sub'),hook:document.getElementById('hook')}
 });
-const st=document.getElementById('status');
-document.getElementById('export').onclick=()=>S.exportVideo({duration:LOOP,filename:'otra-vez-ep10',onStatus:m=>st.textContent=m});
+window.__SEQ=SEQ;
+const stEl=document.getElementById('status');
+document.getElementById('export').onclick=()=>S.exportVideo({duration:LOOP,filename:'otra-vez-ep10',onStatus:m=>stEl.textContent=m});
 })();
 </script>
 </body></html>

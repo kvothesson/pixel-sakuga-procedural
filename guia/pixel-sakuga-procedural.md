@@ -344,3 +344,11 @@ El salto de paradigma recomendado en la sección 13. El mismo pixel art, pero ah
   - Dentro de un artifact de claude.ai el navegador bloquea la descarga, así que hay que exportar desde el archivo local o desde GitHub Pages.
 - **Animatic primero:** el episodio largo se arma primero como animatic (los 21 planos con cámara y poses básicas, la música completa y una etiqueta por plano). Así se aprueban historia y ritmo antes de invertir en pulir cada plano.
 - `tools/check.py` ahora también recorre escenas largas (hasta 60 s).
+
+### Iteración de historia del Ep. 10 (feedback: "pasa de un lado al otro sin sentido")
+- **Una regla, mostrada antes de usarla.** "El eco copia a Midori y devuelve todo con medio segundo de atraso." Se muestra en los planos 3 y 5, se pone a prueba en el 8 y el 11, y se usa para ganar en el 14. Si la regla aparece recién en el clímax, la victoria se siente arbitraria.
+- **Causa y efecto en cada corte.** Cada plano responde al anterior. Nada de personajes derribados que reaparecen parados sin un plano que los levante.
+- **Regla de 180°.** Héroes a la izquierda y eco a la derecha durante todo el episodio, para que el espectador nunca pierda la geografía.
+- **Nada de símbolos que solo entiende el autor.** Dos rayitas sobre negro no se leen como ojos. El cierre ahora usa la misma imagen que el gancho (rima visual).
+- **Reflejos legibles.** Un charco visto desde arriba muestra solo los pies. Para que el reflejo cuente historia hace falta un **charco en primer plano** con cámara baja, reflejado sobre la línea de los pies.
+- **Storyboard antes que animatic.** `tools/storyboard.py` captura el instante clave de cada plano y `escenas/otra-vez-ep10/storyboard/` es la hoja con acción, cámara, sonido y lista de cosas a corregir por plano. Iterar ahí es barato.
