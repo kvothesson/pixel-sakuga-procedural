@@ -37,7 +37,7 @@ E.musicTick=function(prev,cur,bpm,section){
 // ---------- exportar video ----------
 // Graba el canvas a 1080×1920 (resolución interna 135×240 ×8, pixel perfecto) con el audio de la escena y los textos quemados.
 // Nota: dentro de un artifact de claude.ai el navegador bloquea la descarga; funciona abriendo el archivo local o desde GitHub Pages.
-E.exportVideo=async function({duration,fps=30,onStatus=()=>{}}){
+E.exportVideo=async function({duration,fps=30,filename='otra-vez',onStatus=()=>{}}){
   const A=E.audio;
   if(!A.ctx){onStatus('Activá el sonido primero (botón ♪)');return}
   const mimes=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'];
@@ -50,8 +50,14 @@ E.exportVideo=async function({duration,fps=30,onStatus=()=>{}}){
   const t0=performance.now();
   await new Promise(r=>{const tick=()=>{const el=(performance.now()-t0)/1000;onStatus(`Grabando… ${Math.min(100,Math.round(el/duration*100))} %`);if(el>=duration)r();else setTimeout(tick,200)};tick()});
   rec.stop();await done;A.master.disconnect(dest);E.setExport(false);
-  const blob=new Blob(chunks,{type:mime.split(';')[0]}),url=URL.createObjectURL(blob),ext=mime.includes('mp4')?'mp4':'webm';
-  const a=document.createElement('a');a.href=url;a.download=`otra-vez-ep10.${ext}`;document.body.appendChild(a);a.click();a.remove();
-  onStatus(`Listo: otra-vez-ep10.${ext} (${(blob.size/1e6).toFixed(1)} MB). Si no se descargó, abrí la escena desde GitHub Pages.`);
+  const blob=new Blob(chunks,{type:mime.split(';')[0]}),ext=mime.includes('mp4')?'mp4':'webm',name=`${filename}.${ext}`,mb=(blob.size/1e6).toFixed(1);
+  // dentro de claude.ai: la capacidad `downloads` (el visor pide confirmación); afuera: descarga directa
+  const dl=await downloadsNS;
+  if(dl){try{await dl.save({filename:name,data:blob});onStatus(`Listo: ${name} (${mb} MB)`)}
+    catch(e){onStatus(e&&e.code==='declined'?'Descarga cancelada.':`No se pudo guardar el video (${e&&e.code||'error'}).`)}return}
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  onStatus(`Listo: ${name} (${mb} MB)`);
 };
+// se pide al cargar: fuera de un visor de claude.ai resuelve null (hasta 10 s), así no demora la exportación
+const downloadsNS=(window.claude&&window.claude.use?window.claude.use('downloads').catch(()=>null):Promise.resolve(null));
 })();

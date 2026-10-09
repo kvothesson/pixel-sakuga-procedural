@@ -165,7 +165,7 @@ S.start({
       sound:document.getElementById('sound'),sub:document.getElementById('sub'),hook:document.getElementById('hook')}
 });
 const st=document.getElementById('status');
-document.getElementById('export').onclick=()=>S.exportVideo({duration:LOOP,onStatus:m=>st.textContent=m});
+document.getElementById('export').onclick=()=>S.exportVideo({duration:LOOP,filename:'otra-vez-ep10',onStatus:m=>st.textContent=m});
 })();
 </script>
 </body></html>
