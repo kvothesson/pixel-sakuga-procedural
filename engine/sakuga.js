@@ -246,7 +246,10 @@ function figure(ch,mode='glow',inkCol){
 function dissolve(level,fn){
   if(level<=0)return;if(level>=1){fn();return}
   const keep=b;lb.clearRect(0,0,E.PW,E.PH);b=lb;fn();
-  for(let y=0;y<E.PH;y++)for(let x=0;x<E.PW;x++)if(BAYER[y&3][x&3]/16>=level)lb.clearRect(x,y,1,1);
+  // perforar con Bayer sobre ImageData: un clearRect por píxel tardaba ~10 ms por llamada
+  const img=lb.getImageData(0,0,E.PW,E.PH),d=img.data,W=E.PW;
+  for(let y=0;y<E.PH;y++){const row=BAYER[y&3];for(let x=0;x<W;x++)if(row[x&3]/16>=level)d[(y*W+x)*4+3]=0}
+  lb.putImageData(img,0,0);
   b=keep;b.drawImage(layer,0,0);
 }
 function ditherEllipse(cx,cy,rx,ry,c,level){cx=Math.round(cx);cy=Math.round(cy);if(rx<1||ry<.5||level<=0)return;b.fillStyle=c;

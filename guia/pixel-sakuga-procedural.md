@@ -392,3 +392,10 @@ Short de 10 s con la cámara clavada: en la calle de un country con cartel de m�
 - **El entorno muestra la ráfaga:** la gorra del guardia sale volando y vuelve a caer en la cabeza, los yuyos se inclinan y el chorro de los aspersores se desvía (`gust(t)`).
 - **Cartel que gira sobre el poste:** disco dibujado por filas con medio ancho `r·|cos θ|`; con `cos θ < 0` se ve el dorso gris. Tres vueltas con `easeOut` y queda de frente, así el loop cierra.
 - **Ojo al revisar grillas:** contar bien a qué instante corresponde cada recuadro antes de "arreglar" un bug que no existe.
+
+### Corrección de Máxima 10 (feedback: "se tilda, los personajes se ven mal y el guardia atraviesa el techo")
+- **`dissolve` era carísimo:** borraba con un `clearRect` por píxel, unos 10 ms por llamada. Con 7 fantasmas por cuadro la escena tardaba 60–78 ms por cuadro y se tildaba. Ahora perfora el alfa sobre `ImageData` (menos de 1 ms). Arreglado en el motor, así que mejora a todas las escenas que lo usan.
+- **Medir antes de adivinar:** cronometrar `__seek(t)` cada 0,25 s muestra en qué tramo se va el tiempo. Ningún cuadro debería pasar de unos 10 ms.
+- **No cuantizar lo lento:** un carrito a 8 fps a baja velocidad salta 3–4 píxeles cada tanto y se lee como la escena tildándose, no como "threes". El movimiento lento va continuo, porque el pixel art ya lo cuantiza a 1 px.
+- **Vehículos con gente adentro:** se dibujan en capas. Atrás la caja, el respaldo y el parante trasero; después el personaje sentado; adelante el asiento, el capó, el parante delantero y el techo. El techo va a la altura de la cabeza más la gorra más un margen. Si no, la cabeza lo atraviesa.
+- **Fantasmas en tinta sólida** (claro → oscuro), no con dither: a escala chica el dither se lee como ruido.

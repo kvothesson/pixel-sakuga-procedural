@@ -51,11 +51,11 @@ const SEAT={hip:[0,-40],chest:[2,-68],head:[4,-83],lE:[8,-56],lH:[20,-55],rE:[10
 const RADIO={...SEAT,rE:[14,-68],rH:[9,-80]};
 
 // ---------- coreografía en un solo plano fijo ----------
-// tres velocidades en el mismo cuadro: carrito en threes (8 fps), nene en twos y ones, carpincho en ones con fantasmas
+// tres velocidades en el mismo cuadro: carrito lento y continuo, nene con pedales a 24 fps, carpincho con fantasmas
 const T={cart0:.8,kid0:3.7,jump:4.41,land:5.0,capy0:5.75,hit:6.0,hitEnd:6.12,radio:6.9,cartOut:9.6};
-const BUMP_X=0,LANE={cart:-14,kid:12,capy:30};
+const BUMP_X=0,LANE={cart:0,kid:24,capy:40};
 const bump=x=>5*Math.max(0,1-((x-BUMP_X)/16)**2);
-function cartX(t){t=q8(t);
+function cartX(t){ // continuo: a esta velocidad, cuantizar a 8 fps se lee como que la escena se tilda
   if(t<T.cart0)return -460;
   if(t<5.0)return lerp(-360,-78,(t-T.cart0)/(5.0-T.cart0));
   if(t<5.3)return -78;                                  // frena del todo antes del lomo
@@ -123,19 +123,28 @@ function sign(){const k=S.cam.k,[px,py]=S.toPx(-78,40),[sx,sy]=S.toPx(-78,-75),r
   if(cs>.82)S.pixText('10',sx,sy+1,r*1.15,'#141414')}
 
 // ---------- calle: carrito, nene, carpincho ----------
-function cart(t,shakeCap){const x=cartX(t),k=S.cam.k,y0=LANE.cart,lift=-(bump(x-40)+bump(x+40))/2;
-  const p=(dx,dy)=>S.toPx(x+dx,y0+lift+dy),flash=Math.floor(S.t*6)%2;
-  const guard={id:'guard',pose:S.t>=T.radio?RADIO:SEAT,dir:1,x:x+2,y:y0+lift-8,noSmear:true};
-  // poste de atrás, guardia, carrocería, poste de adelante y techo
-  {const[a,b]=p(-46,-20),[c,d]=p(-46,-92);S.line(a,b,c,d,Math.max(1,2*k),'#d8d8de')}
-  figAt(guard,1,'plain');
-  {const h=S.toPx(...worldPt(guard,guard.pose.head));const cap=capPos(t,h);S.R(cap[0]-5*k,cap[1]-11*k,11*k,4*k,'#1c2440');S.R(cap[0]+3*k,cap[1]-8*k,5*k,2*k,'#1c2440')}
-  S.poly([p(-60,-36),p(56,-36),p(60,-14),p(-60,-14)],'#141418');S.poly([p(-58,-34),p(54,-34),p(58,-16),p(-58,-16)],'#f0f0f4');
-  S.poly([p(-58,-26),p(57,-26),p(57.5,-22),p(-58,-22)],'#2a5ab4');
-  {const[a,b]=p(40,-36),[c,d]=p(40,-92);S.line(a,b,c,d,Math.max(1,2*k),'#d8d8de')}
-  S.poly([p(-62,-96),p(46,-96),p(46,-90),p(-62,-90)],'#e8e8ee');
-  {const[bx,by]=p(-8,-100);S.R(bx-6*k,by,12*k,4*k,flash?'#ff3040':'#3a70ff');S.ditherDisc(bx,by+2*k,16*k,flash?'#ff3040':'#3a70ff',.4)}
-  for(const wx of[-40,40]){const[cx,cy]=p(wx,-8);S.disc(cx,cy,8*k+1,'#0a0a0c');S.disc(cx,cy,4*k,'#9a9aa6')}
+function cart(t){const x=cartX(t),k=S.cam.k,y0=LANE.cart,lift=-(bump(x-40)+bump(x+40))/2;
+  const p=(dx,dy)=>S.toPx(x+dx,y0+lift+dy),flash=Math.floor(S.t*6)%2,P_=pts=>pts.map(([a,b])=>p(a,b));
+  const shape=(pts,col)=>{const q=P_(pts);for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]])S.poly(q.map(([a,b])=>[a+dx,b+dy]),'#141418');S.poly(q,col)};
+  const post=(a,b,c,d)=>{const[x1,y1]=p(a,b),[x2,y2]=p(c,d);S.line(x1,y1,x2,y2,Math.max(2,3*k)+1,'#141418');S.line(x1,y1,x2,y2,Math.max(1,3*k),'#e4e4ea')};
+  // carrito de golf de perfil, mirando a la derecha: atrás la caja, el respaldo y el parante; el guardia sentado; adelante el asiento, el capó y el techo bien arriba de su cabeza
+  post(-58,-46,-58,-124);
+  shape([[-66,-14],[-30,-14],[-30,-50],[-60,-50],[-66,-42]],'#eeeef2');
+  shape([[-36,-80],[-28,-80],[-26,-46],[-34,-46]],'#26262c');
+  const guard={id:'guard',pose:S.t>=T.radio?RADIO:SEAT,dir:1,x:x-12,y:y0+lift-10,noSmear:true};
+  S.figure(guard,'plain');
+  {const h=S.toPx(...worldPt(guard,guard.pose.head)),cap=capPos(t,h);S.R(cap[0]-5*k,cap[1]-11*k,11*k,4*k,'#1c2440');S.R(cap[0]+4*k,cap[1]-8*k,5*k,2*k,'#1c2440')}
+  shape([[-32,-14],[16,-14],[16,-40],[-32,-40]],'#eeeef2');
+  S.poly(P_([[-32,-46],[14,-46],[14,-40],[-32,-40]]),'#26262c');
+  shape([[14,-14],[66,-14],[68,-28],[58,-44],[32,-50],[14,-42]],'#eeeef2');
+  S.poly(P_([[-64,-28],[66,-28],[66.5,-24],[-64,-24]]),'#2a5ab4');
+  {const[hx,hy]=p(64,-34);S.R(hx-2*k,hy,3*k,3*k,'#fff6b0')}
+  {const[a,b]=p(26,-48),[c,d]=p(14,-64);S.line(a,b,c,d,Math.max(1,2*k),'#26262c');S.R(c-4*k,d-1,8*k,Math.max(1,2*k),'#26262c')} // volante
+  post(34,-50,44,-124);
+  {const[a,b]=p(36,-56),[c,d]=p(43,-118);S.line(a+2,b,c+2,d,1,'#9ad0f0')} // parabrisas
+  shape([[-66,-130],[52,-130],[52,-123],[-66,-123]],'#eeeef2');
+  {const[bx,by]=p(-6,-136);S.R(bx-7*k,by,14*k,5*k,flash?'#ff3040':'#3a70ff');S.ditherDisc(bx,by+2*k,18*k,flash?'#ff3040':'#3a70ff',.4)}
+  for(const wx of[-40,40]){const[cx,cy]=p(wx,-10);S.disc(cx,cy,10*k+1,'#0a0a0c');S.disc(cx,cy,5*k,'#9a9aa6')}
 }
 // la gorra del guardia: la ráfaga del nene se la levanta y vuelve a caer en su cabeza
 function capPos(t,h){let off=0,dx=0;const k=S.cam.k;
@@ -145,7 +154,7 @@ function kid(t){const kp=kidPos(t);if(!kp)return;
   const a=q24(t)*Math.PI*2*7,hub=[12,-14],pedal=s=>[hub[0]+Math.cos(a+s)*6,hub[1]+Math.sin(a+s)*6],lF=pedal(0),rF=pedal(Math.PI);
   const knee=F=>[(-6+F[0])/2+7,(-36+F[1])/2-7];
   const pose={hip:[-6,-36],chest:[0,-60],head:[4,-75],lE:[6,-50],lH:[16,-48],rE:[7,-49],rH:[17,-47],lK:knee(lF),lF,rK:knee(rF),rF};
-  const draw=(x,mode,ink)=>{const ch={id:'kid',pose,dir:1,x,y:LANE.kid+kp.y,rot:kp.rot,noSmear:true},sc=.62,c=S.cam;
+  const draw=(x,mode,ink)=>{const ch={id:'kid',pose,dir:1,x,y:LANE.kid+kp.y,rot:kp.rot,noSmear:true},sc=.72,c=S.cam;
     // el triciclo en el mismo espacio escalado que el nene
     const[X,Y]=S.toPx(x,ch.y),k=c.k*sc,cam={...c,k,camX:x-(X-c.cx)/k,camY:ch.y-(Y-c.cy)/k};
     withCam(cam,()=>{const w=q=>S.toPx(...worldPt(ch,q)),K=S.cam.k,col=c2=>ink||c2;
@@ -155,7 +164,8 @@ function kid(t){const kp=kidPos(t);if(!kp)return;
       {const[cx,cy]=w(hub);S.disc(cx,cy,14*K+1,col('#111'));S.disc(cx,cy,10*K,col('#d8d8d8'));S.disc(cx,cy,3*K,col('#d4202c'))}
       S.figure(ch,mode,ink)})};
   // fantasmas: copias en tinta en las posiciones de los cuadros anteriores
-  for(let g=3;g>=1;g--){const pk=kidPos(t-g/24);if(pk)S.dissolve(.55-g*.13,()=>draw(pk.x,'ink',g>1?'#f2c218':'#ffe680'))}
+  // fantasmas en tinta sólida, cada vez más oscuros (el dither se leía como ruido a esta escala)
+  for(let g=3;g>=1;g--){const pk=kidPos(t-g/24);if(pk)draw(pk.x,'ink',['#ffe680','#d8a818','#8a6a10'][g-1])}
   draw(kp.x,'plain');
   const[sx,sy]=S.toPx(kp.x,LANE.kid+kp.y-20);for(let i=0;i<6;i++){const f=Math.floor(t*24),yy=sy+(hash(f+i)-.5)*30*S.cam.k;S.line(sx-30*S.cam.k,yy,sx-(60+hash(i+f)*90)*S.cam.k,yy,1,'#ffffff')}
 }
@@ -171,7 +181,7 @@ function capybara(t,x,ink){const k=S.cam.k,y0=LANE.capy,f=Math.floor(t*24),ph=f%
   if(!ink){const[ex,ey]=p(42,-30);S.R(ex,ey,Math.max(1,3*k),1,'#140c08');const[nx,ny]=p(50,-30);S.R(nx,ny,Math.max(1,2*k),Math.max(1,2*k),'#2a1a10');const[ax,ay]=p(30,-38);S.R(ax,ay,Math.max(1,3*k),Math.max(1,3*k),'#6e4628')}
 }
 function capy(t){const x=capyX(t);if(x==null)return;
-  for(let g=4;g>=1;g--){const px=capyX(t-g/24);if(px!=null)S.dissolve(.6-g*.12,()=>capybara(t,px,g>2?'#c48a4a':'#ffd8a0'))}
+  for(let g=3;g>=1;g--){const px=capyX(t-g*1.5/24);if(px!=null)capybara(t,px,['#ffd8a0','#c48a4a','#6e4628'][g-1])}
   capybara(t,x);
   const k=S.cam.k;for(let i=0;i<10;i++){const d=hash(i)*160,lv=.55*(1-d/160),[px,py]=S.toPx(x-50-d,LANE.capy-4-hash(i+3)*14);S.ditherDisc(px,py,(4+d*.08)*k*2,'#9a8a5a',lv)}
   const f=Math.floor(t*24);for(let i=0;i<8;i++){const[sx,sy]=S.toPx(x-40,LANE.capy-24+(hash(f+i)-.5)*40);S.line(sx,sy,sx-(80+hash(f*3+i)*160)*k,sy,1,'#fff6e0')}
