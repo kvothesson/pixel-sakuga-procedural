@@ -414,3 +414,8 @@ Seis escenas en un country, todas con la cámara quieta y vistas de lejos: la ga
 - **Composición en profundidad para "pasar" a alguien:** si el que pasa va en un carril más cercano (laguna adelante, bici en el carril de adelante del carrito), nunca queda tapado por el que es pasado.
 - **Mesa vista de perfil:** los comensales se dibujan detrás de un mantel a cuadros que tapa las piernas. Los de la izquierda miran a la derecha y los de la derecha a la izquierda; el carpincho en la cabecera, sentado (`mode:'sit'`), queda solo y se lee.
 - **Cumbia procedural** para el asado: bombo en negras, güiro (bandpass agudo, largo y dos cortos), bajo de dos notas y acorde de cuadradas en el contratiempo, sobre el mismo reloj del secuenciador.
+
+### Corrección del episodio (feedback: "el guardia sobresale; que no sea él el que persigue; el carpincho no tan rápido")
+- **Un personaje, un rol:** el guardia de la garita estaba en todas las escenas y tapaba al resto. Ahora se queda en la cabina y llama por radio ("—Móvil 2, móvil 2…"), y el que persigue en el carrito es otro: el de la patrulla, con chaleco flúor y canas, distinto en silueta y color.
+- **El carpincho, apenas más rápido que la bici** (320 contra 200 unidades/s): el chiste es que gana sin esfuerzo, no que sea un rayo. Se sacaron el hit-stop, el estruendo y las tres vueltas del cartel, que ya no tenían sentido.
+- **Pasar por debajo de alguien en el aire** se lee solo si el salto deja aire: con 50 unidades de altura la bici y el carpincho quedaban pegados; con 95 se ve el hueco.
