@@ -400,3 +400,17 @@ Short de 10 s con la cámara clavada: en la calle de un country con cartel de m�
 - **Vehículos con gente adentro:** se dibujan en capas. Atrás la caja, el respaldo y el parante trasero; después el personaje sentado; adelante el asiento, el capó, el parante delantero y el techo. El techo va a la altura de la cabeza más la gorra más un margen. Si no, la cabeza lo atraviesa.
 - **Fantasmas en tinta sólida** (claro → oscuro), no con dither: a escala chica el dither se lee como ruido.
 - **Velocidad relativa, no absoluta** (feedback: "la bici no se llega a ver"): a 450 unidades/s la bici cruzaba en 0,7 s y no se leía. Lo que cuenta es el contraste: carrito a ~37 unidades/s, bici a 200 (cruza en unos 2 s, se ve entera) y solo el carpincho a 720. Los fantasmas son para lo rapidísimo; a velocidad de bici alcanza con uno.
+
+---
+
+## 20. Máxima 10 · Episodio — 64 s de planos fijos con globos de texto
+
+Seis escenas en un country, todas con la cámara quieta y vistas de lejos: la garita (el guardia le pide a la visita papeles cada vez más absurdos mientras el carpincho pasa por debajo de la barrera), Máxima 10, el grupo de WhatsApp, las señoras de calzas, el pádel y el asado, donde el carpincho come un choripán en la cabecera y nadie reacciona. Los une un chiste: el guardia persigue al carpincho en el carrito a paso de hombre y llega tarde a todo.
+
+- **Diseño dirigido por el usuario:** primero se escribió cada escena en texto y el usuario ajustó (el pedido absurdo de la garita, "llamen al consorcio", el choripán). Recién después se programó. Para humor local, el usuario sabe qué es reconocible; preguntar es más barato que rehacer.
+- **Globos de texto en el DOM, encima del canvas:** el texto largo no entra en pixel a 150 px de ancho. `post()` arma la lista de globos del instante y solo toca el DOM cuando cambia. Usan `cqw` (container queries sobre el stage) para escalar con el cuadro. Contra: la exportación de video quema subtítulos, no estos globos.
+- **Chat de WhatsApp como columna flex** con los últimos 4 mensajes: los globos con posición absoluta se pisaban.
+- **Cada escena elige sus planos:** el plano medio de Máxima 10 (0,78) deja el asado y la laguna chiquitos. El asado usa 1,05 y las señoras 1,0. Y el pasto de primer plano se saca donde taparía la acción (la laguna va adelante del camino, así el carpincho que nada no queda detrás de las señoras).
+- **Composición en profundidad para "pasar" a alguien:** si el que pasa va en un carril más cercano (laguna adelante, bici en el carril de adelante del carrito), nunca queda tapado por el que es pasado.
+- **Mesa vista de perfil:** los comensales se dibujan detrás de un mantel a cuadros que tapa las piernas. Los de la izquierda miran a la derecha y los de la derecha a la izquierda; el carpincho en la cabecera, sentado (`mode:'sit'`), queda solo y se lee.
+- **Cumbia procedural** para el asado: bombo en negras, güiro (bandpass agudo, largo y dos cortos), bajo de dos notas y acorde de cuadradas en el contratiempo, sobre el mismo reloj del secuenciador.

@@ -5,6 +5,7 @@ Escenas de pelea con dirección de anime en pixel art, generadas íntegramente p
 ## Escenas
 | Escena | Formato | Qué estrena |
 |---|---|---|
+| [Máxima 10 · Episodio](escenas/maxima-10-episodio/) | **Episodio** vertical 9:16, 64 s, seis planos fijos | Globos de texto y chat de WhatsApp sobre el canvas, carpincho en cuatro modos (galope, paso, nado, sentado), cumbia procedural |
 | [Máxima 10](escenas/maxima-10/) | Short vertical 9:16, loop perfecto de 10 s, plano fijo | Planos de profundidad con cámara quieta, tres velocidades en el mismo cuadro, cartel que gira |
 | [Otra Ronda · Ramal ∞](escenas/otra-ronda/) | Short vertical 9:16, loop perfecto de 10 s (spin-off argentino) | Color cycling en paleta de fileteado, filetes procedurales, colectivo a escala, boleadoras, final de tango |
 | [Otra Vez · Ep. 10](escenas/otra-vez-ep10/) | **Episodio completo** 9:16, 60 s (en producción: animatic) | Secuenciador de planos en beats, música procedural por sección, exportar video 1080×1920 |
