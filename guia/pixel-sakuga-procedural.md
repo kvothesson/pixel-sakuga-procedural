@@ -419,3 +419,10 @@ Seis escenas en un country, todas con la cámara quieta y vistas de lejos: la ga
 - **Un personaje, un rol:** el guardia de la garita estaba en todas las escenas y tapaba al resto. Ahora se queda en la cabina y llama por radio ("—Móvil 2, móvil 2…"), y el que persigue en el carrito es otro: el de la patrulla, con chaleco flúor y canas, distinto en silueta y color.
 - **El carpincho, apenas más rápido que la bici** (320 contra 200 unidades/s): el chiste es que gana sin esfuerzo, no que sea un rayo. Se sacaron el hit-stop, el estruendo y las tres vueltas del cartel, que ya no tenían sentido.
 - **Pasar por debajo de alguien en el aire** se lee solo si el salto deja aire: con 50 unidades de altura la bici y el carpincho quedaban pegados; con 95 se ve el hueco.
+
+### Exportar a MP4 para YouTube (`tools/render_mp4.py`)
+- **Video cuadro por cuadro con `__seek(t)`**, no grabando en tiempo real: es determinista y no pierde cuadros aunque la máquina sea lenta (64 s a 30 fps tardan unos 6 minutos).
+- **Los globos del DOM salen en el video** porque se captura el stage entero (canvas + DOM), no solo el canvas. El stage se fija en 360×640 CSS a escala 3: sale 1080×1920 y los globos quedan del tamaño que tienen en un celular.
+- **Audio en una pasada aparte en tiempo real:** el master de Web Audio va a un `MediaStreamDestination` grabado con MediaRecorder desde t=0. Después ffmpeg junta todo (H.264 crf 16 + AAC, `faststart`) y normaliza el volumen con `loudnorm` a −14 LUFS, el estándar de YouTube (sin eso quedaba en −29 dB de pico).
+- **Sin red no carga Google Fonts:** con `--font` se le pasa la DotGothic16 en woff2 (del paquete `@fontsource/dotgothic16` de npm). Si no, los globos salen en monospace.
+- Uso: `python3 tools/render_mp4.py escenas/X/index.html salida.mp4 --font carpeta/`
