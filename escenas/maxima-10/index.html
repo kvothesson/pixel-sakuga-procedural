@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Máxima 10</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* Layout: short vertical 9:16 centrado, subtítulos abajo, controles debajo. Look de atardecer en el country, fijo (single-theme a propósito). */
+:root{
+  --night:#0d0a14;
+  --ink:#ece8f6;
+  --dim:#8a83a6;
+  --pasto:#4a9a3c;
+  --cartel:#d4202c;
+  --f-pixel:"DotGothic16","MS Gothic",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--ink);margin:0}
+body{font-family:var(--f-pixel);padding-inline:16px;padding-block:16px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.stage{position:relative;width:min(100%,calc(82vh * 9 / 16));aspect-ratio:9/16;max-width:100%;overflow:hidden;background:#000;cursor:pointer;border-radius:10px;box-shadow:0 0 0 2px #23401c}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.hook{position:absolute;top:13%;left:0;right:0;text-align:center;pointer-events:none;font-size:clamp(18px,6vw,30px);color:#fff}
+.sub{position:absolute;left:50%;bottom:6%;transform:translateX(-50%);width:92%;text-align:center;pointer-events:none;
+  font-size:clamp(17px,5vw,24px);color:#fff;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000,0 -2px #000}
+.sub small{display:block;font-size:.62em;color:#ffd84a;letter-spacing:.1em}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;color:var(--dim);font-size:14px}
+button{font:inherit;color:var(--ink);background:#141020;border:2px solid #34404a;padding:6px 14px;cursor:pointer;letter-spacing:.06em}
+button:hover{border-color:var(--pasto);color:#fff}
+button[aria-pressed="true"]{border-color:var(--pasto);color:#fff}
+button:focus-visible{outline:2px solid var(--pasto);outline-offset:2px}
+</style>
+</head><body>
+<div class="stage" id="stage">
+  <canvas id="c" aria-label="Short vertical en pixel art, plano fijo: en la calle de un country con cartel de máxima 10, un carrito de seguridad avanza lentísimo, un nene en triciclo lo pasa y salta el lomo de burro, y un carpincho pasa todavía más rápido"></canvas>
+  <div class="hook" id="hook"></div>
+  <div class="sub" id="sub"></div>
+</div>
+<div class="controls">
+  <button id="sound" type="button" aria-pressed="false">♪ ACTIVAR SONIDO</button>
+  <button id="toggle" type="button">❚❚ PAUSA</button>
+</div>
+<script src="../../engine/sakuga.js"></script>
+<script>
+(()=>{
+const S=window.Sakuga,{lerp,ease,easeOut,clamp,segAt,worldPt,q8,q12,q24,hash}=S;
+const LOOP=10.0;
+
+// ---------- personajes (se ven de lejos: alcanza con la silueta y el color) ----------
+const GUARD={head:'hair',pal:{coat:'#5a78b4',coatD:'#3e5688',pants:'#232a3e',pantsD:'#1a2030',boot:'#111',skin:'#d0a07a',neck:'#d0a07a',glove:'#d0a07a',hair:'#2a1e16',aura:'#fff',dark:'#333'}};
+const KID={head:'hair',pal:{coat:'#f2c218',coatD:'#c89a10',pants:'#d4202c',pantsD:'#a01820',boot:'#f4f4f4',skin:'#e8b48a',neck:'#e8b48a',glove:'#e8b48a',hair:'#5a3418',aura:'#fff',dark:'#333'}};
+const SEAT={hip:[0,-40],chest:[2,-68],head:[4,-83],lE:[8,-56],lH:[20,-55],rE:[10,-56],rH:[21,-56],lK:[16,-42],lF:[20,-16],rK:[18,-42],rF:[22,-16]};
+const RADIO={...SEAT,rE:[14,-68],rH:[9,-80]};
+
+// ---------- coreografía en un solo plano fijo ----------
+// tres velocidades en el mismo cuadro: carrito en threes (8 fps), nene en twos y ones, carpincho en ones con fantasmas
+const T={cart0:.8,kid0:3.7,jump:4.41,land:5.0,capy0:5.75,hit:6.0,hitEnd:6.12,radio:6.9,cartOut:9.6};
+const BUMP_X=0,LANE={cart:-14,kid:12,capy:30};
+const bump=x=>5*Math.max(0,1-((x-BUMP_X)/16)**2);
+function cartX(t){t=q8(t);
+  if(t<T.cart0)return -460;
+  if(t<5.0)return lerp(-360,-78,(t-T.cart0)/(5.0-T.cart0));
+  if(t<5.3)return -78;                                  // frena del todo antes del lomo
+  if(t<6.6)return lerp(-78,12,ease((t-5.3)/1.3));        // lo sube a paso de hombre
+  return lerp(12,380,(t-6.6)/(T.cartOut-6.6))}
+const CART_L=120,KID_V=450,CAPY_V=1130;
+function kidPos(t){
+  if(t<T.kid0||t>5.3)return null;
+  if(t<T.jump)return{x:-330+KID_V*(t-T.kid0),y:0,rot:0};
+  if(t<T.land){const q=(t-T.jump)/(T.land-T.jump);return{x:lerp(0,KID_V*(T.land-T.jump),q),y:-Math.sin(Math.PI*q)*90,rot:-.35*Math.cos(Math.PI*q)}}
+  return{x:KID_V*(T.land-T.jump)+KID_V*(t-T.land),y:0,rot:0}}
+const capyX=t=>t<T.capy0||t>6.6?null:-340+CAPY_V*(t-T.capy0);
+const signAngle=t=>t<T.hitEnd?0:t<7.6?Math.PI*2*3.2*(1-Math.exp(-(t-T.hitEnd)*2.2))/(1-Math.exp(-1.5*2.2))*Math.min(1,1):0;
+function signRot(t){if(t<T.hitEnd||t>=7.6)return 0;const q=(t-T.hitEnd)/(7.6-T.hitEnd);return Math.PI*2*3*easeOut(q)} // tres vueltas que frenan y quedan de frente
+const gust=t=>Math.max(t>4.05&&t<4.7?1-(t-4.05)/.65:0,t>T.hit&&t<6.9?1-(t-T.hit)/.9:0);
+
+function state(t){
+  const s={phase:'calle',cam:{zoom:.85,shake:t>=T.hitEnd&&t<6.3?4*(1-segAt(t,T.hitEnd,6.3)):0},chars:[]};
+  if(t>=T.hit&&t<T.hitEnd){s.freeze=T.hit;s.phase='hit'}
+  return s}
+
+// ---------- tres planos de profundidad con la misma cámara fija ----------
+// cada plano es una escala distinta: casas (lejos), calle (medio) y pasto con cartel (cerca). La cámara no se mueve nunca.
+function plane(scale,groundFrac){const c=S.cam,k=S.u*.85*scale,cy=S.PH*.5;
+  return{k,cx:c.cx,cy,camX:0,camY:-(S.PH*groundFrac-cy)/k,rot:0}}
+function withCam(cam,fn){const keep=S.cam;S.cam=cam;fn();S.cam=keep}
+// dibuja una figura a otra escala manteniendo su punto de apoyo en el mismo lugar de la pantalla
+function figAt(ch,scale,mode,ink){const c=S.cam,[X,Y]=S.toPx(ch.x,ch.y||0),k=c.k*scale;
+  withCam({...c,k,camX:ch.x-(X-c.cx)/k,camY:(ch.y||0)-(Y-c.cy)/k},()=>S.figure(ch,mode,ink))}
+
+function sky(){const{R,PW,PH}=S,H=PH*.46,bands=['#2c1d4c','#4a2458','#7e3060','#c4505a','#ec7a48','#f6b25e'];
+  bands.forEach((c,i)=>{R(0,i*H/bands.length,PW,H/bands.length+1,c);if(i<bands.length-1)S.ditherFill(.5,bands[i+1],0,(i+1)*H/bands.length-2,PW,(i+1)*H/bands.length)});
+  S.disc(PW*.24,H*.86,PW*.09,'#ffe0a0');S.disc(PW*.24,H*.86,PW*.07,'#fff2d0');
+  for(let i=0;i<4;i++){const x=((hash(i)*PW*1.4+S.t*PW*1.4/LOOP)%(PW*1.4))-PW*.2,y=H*(.2+hash(i+5)*.4);S.R(x,y,PW*(.12+hash(i+2)*.1),2,'#f49a70');S.R(x+4,y-1,PW*.08,1,'#ffc898')}}
+function houses(){const{toPx,poly,R}=S,k=S.cam.k;
+  for(let i=-9;i<10;i++){const x=i*120;
+    // todas iguales: paredes blancas, techo de pizarra, ventanal y cerco de ligustro
+    const[a,g0]=toPx(x-40,0),[b]=toPx(x+40,0),[,wt]=toPx(0,-60),[ra]=toPx(x-48,0),[rb]=toPx(x+48,0),[rx,rt]=toPx(x,-100);
+    poly([[ra,wt],[rb,wt],[rx,rt]],'#5a5868');R(a,wt,b-a,g0-wt,'#ece6dc');R(a,wt,b-a,2,'#c8c0b4');
+    const[wx,wy]=toPx(x-28,-44);R(wx,wy,24*k,20*k,'#ffcf7a');const[dx,dy]=toPx(x+10,-40);R(dx,dy,14*k,40*k,'#6a4a32');
+    const[tx,ty]=toPx(x+70,-46);S.disc(tx,ty,26*k,'#2a5a2c');S.disc(tx-6*k,ty-8*k,18*k,'#3a7034');R(tx-2*k,ty+20*k,4*k,26*k,'#4a3020');}
+  const[,gy]=toPx(0,0);R(0,gy-3*k*6,S.PW,3*k*6,'#2f6a2a')}
+function street(){const{R}=S,k=S.cam.k,[,gy]=S.toPx(0,0),top=gy-20*k*2.2,bot=gy+46*k;
+  R(0,S.PH*.46,S.PW,top-S.PH*.46,'#4e9440');for(let x=0;x<S.PW;x+=6)R(x,S.PH*.46+((x*7)%5),1,2,'#3c7c34');
+  R(0,top,S.PW,bot-top,'#55525e');R(0,top,S.PW,1,'#d8d4cc');R(0,bot,S.PW,2,'#d8d4cc');
+  // lomo de burro: franja amarilla y negra cruzando la calle
+  const[bx]=S.toPx(BUMP_X,0);for(let y=top+1;y<bot;y++){const w=(7*k+(y-top)*.12);for(let x=-w;x<w;x+=Math.max(2,3*k))R(bx+x,y,Math.max(1,1.5*k),1,((x/Math.max(2,3*k))|0)%2?'#f2c218':'#1a1a1a')}
+  return{top,bot}}
+function lawnNear(){const{R}=S,top=Math.max(0,Math.ceil(S.toPx(0,0)[1]-S.PH*.35));
+  // franjas del corte de césped en diagonal: el pasto perfecto del country
+  const top0=Math.round(S.PH*.62+20);R(0,top0,S.PW,S.PH-top0,'#4a9a3c');const bw=Math.max(6,Math.round(S.PW/9));
+  for(let y=top0;y<S.PH;y++){const off=Math.round((y-top0)*.7)%(2*bw);for(let x=-2*bw+off;x<S.PW;x+=2*bw)R(x,y,bw,1,'#58aa48')}}
+function tufts(){const g=gust(S.t),f=Math.floor(S.t*12);for(let i=0;i<26;i++){const[x,y]=S.toPx(-120+hash(i)*240,-110+hash(i+9)*230),k=S.cam.k,lean=g*7+Math.sin(f*.7+i)*.6;
+  S.line(x,y,x+lean*k,y-6*k,1,'#2f7a2a');S.line(x+2,y,x+2+lean*k*.8,y-4*k,1,'#68b858')}}
+function sprinkler(xw,yw,seed){const[x,y]=S.toPx(xw,yw),k=S.cam.k,g=gust(S.t);S.R(x-2,y-2,4,3,'#2a2a2a');
+  const base=(S.t*Math.PI*2/(LOOP/5))%(Math.PI*2);
+  for(let i=0;i<14;i++){const a=-Math.PI*.15-((base+i*.22)%Math.PI)*.7,d=(14+i*4)*k,px=x+Math.cos(a)*d+g*i*3*k,py=y+Math.sin(a)*d*.8+(i*i*.12)*k;
+    S.R(px,py,1,1,i%3?'#bfe8ff':'#ffffff')}}
+function sign(){const k=S.cam.k,[px,py]=S.toPx(-78,40),[sx,sy]=S.toPx(-78,-75),r=26*k,a=signRot(S.t),cs=Math.cos(a),hw=Math.abs(cs);
+  S.line(px,py,sx,sy,Math.max(2,3*k),'#1a1a1e');S.line(px+1,py,sx+1,sy,1,'#8a8a96');
+  for(let dy=-r-1;dy<=r+1;dy++){const w=Math.sqrt(Math.max(0,(r+1)**2-dy*dy))*hw;S.R(sx-w-1,sy+dy,2*w+2,1,'#1a1a1e')}
+  for(let dy=-r;dy<=r;dy++){const w0=Math.sqrt(Math.max(0,r*r-dy*dy)),w=w0*hw,inner=Math.sqrt(Math.max(0,(r*.74)**2-dy*dy))*hw;
+    if(cs<0){S.R(sx-w,sy+dy,2*w,1,dy<0?'#a8a8b0':'#8a8a94');continue}
+    S.R(sx-w,sy+dy,2*w,1,'#d4202c');if(inner>0)S.R(sx-inner,sy+dy,2*inner,1,'#f6f4ee')}
+  if(cs>.82)S.pixText('10',sx,sy+1,r*1.15,'#141414')}
+
+// ---------- calle: carrito, nene, carpincho ----------
+function cart(t,shakeCap){const x=cartX(t),k=S.cam.k,y0=LANE.cart,lift=-(bump(x-40)+bump(x+40))/2;
+  const p=(dx,dy)=>S.toPx(x+dx,y0+lift+dy),flash=Math.floor(S.t*6)%2;
+  const guard={id:'guard',pose:S.t>=T.radio?RADIO:SEAT,dir:1,x:x+2,y:y0+lift-8,noSmear:true};
+  // poste de atrás, guardia, carrocería, poste de adelante y techo
+  {const[a,b]=p(-46,-20),[c,d]=p(-46,-92);S.line(a,b,c,d,Math.max(1,2*k),'#d8d8de')}
+  figAt(guard,1,'plain');
+  {const h=S.toPx(...worldPt(guard,guard.pose.head));const cap=capPos(t,h);S.R(cap[0]-5*k,cap[1]-11*k,11*k,4*k,'#1c2440');S.R(cap[0]+3*k,cap[1]-8*k,5*k,2*k,'#1c2440')}
+  S.poly([p(-60,-36),p(56,-36),p(60,-14),p(-60,-14)],'#141418');S.poly([p(-58,-34),p(54,-34),p(58,-16),p(-58,-16)],'#f0f0f4');
+  S.poly([p(-58,-26),p(57,-26),p(57.5,-22),p(-58,-22)],'#2a5ab4');
+  {const[a,b]=p(40,-36),[c,d]=p(40,-92);S.line(a,b,c,d,Math.max(1,2*k),'#d8d8de')}
+  S.poly([p(-62,-96),p(46,-96),p(46,-90),p(-62,-90)],'#e8e8ee');
+  {const[bx,by]=p(-8,-100);S.R(bx-6*k,by,12*k,4*k,flash?'#ff3040':'#3a70ff');S.ditherDisc(bx,by+2*k,16*k,flash?'#ff3040':'#3a70ff',.4)}
+  for(const wx of[-40,40]){const[cx,cy]=p(wx,-8);S.disc(cx,cy,8*k+1,'#0a0a0c');S.disc(cx,cy,4*k,'#9a9aa6')}
+}
+// la gorra del guardia: la ráfaga del nene se la levanta y vuelve a caer en su cabeza
+function capPos(t,h){let off=0,dx=0;const k=S.cam.k;
+  for(const[t0,dur,hgt]of[[4.12,.55,34],[T.hitEnd,.7,52]])if(t>=t0&&t<t0+dur){const q=(t-t0)/dur;off=Math.sin(Math.PI*q)*hgt;dx=Math.sin(Math.PI*2*q)*6}
+  return[h[0]+dx*k,h[1]-off*k]}
+function kid(t){const kp=kidPos(t);if(!kp)return;
+  const a=q24(t)*Math.PI*2*7,hub=[12,-14],pedal=s=>[hub[0]+Math.cos(a+s)*6,hub[1]+Math.sin(a+s)*6],lF=pedal(0),rF=pedal(Math.PI);
+  const knee=F=>[(-6+F[0])/2+7,(-36+F[1])/2-7];
+  const pose={hip:[-6,-36],chest:[0,-60],head:[4,-75],lE:[6,-50],lH:[16,-48],rE:[7,-49],rH:[17,-47],lK:knee(lF),lF,rK:knee(rF),rF};
+  const draw=(x,mode,ink)=>{const ch={id:'kid',pose,dir:1,x,y:LANE.kid+kp.y,rot:kp.rot,noSmear:true},sc=.62,c=S.cam;
+    // el triciclo en el mismo espacio escalado que el nene
+    const[X,Y]=S.toPx(x,ch.y),k=c.k*sc,cam={...c,k,camX:x-(X-c.cx)/k,camY:ch.y-(Y-c.cy)/k};
+    withCam(cam,()=>{const w=q=>S.toPx(...worldPt(ch,q)),K=S.cam.k,col=c2=>ink||c2;
+      for(const q of[[-20,-7]]){const[cx,cy]=w(q);S.disc(cx,cy,7*K+1,col('#111'));S.disc(cx,cy,4*K,col('#d8d8d8'))}
+      const[a1,b1]=w([-20,-7]),[a2,b2]=w(hub),[a3,b3]=w([-6,-34]),[a4,b4]=w([14,-48]);
+      S.line(a1,b1,a2,b2,Math.max(1,3*K),col('#d4202c'));S.line(a1,b1,a3,b3,Math.max(1,3*K),col('#d4202c'));S.line(a2,b2,a4,b4,Math.max(1,2*K),col('#9a9aa6'));
+      {const[cx,cy]=w(hub);S.disc(cx,cy,14*K+1,col('#111'));S.disc(cx,cy,10*K,col('#d8d8d8'));S.disc(cx,cy,3*K,col('#d4202c'))}
+      S.figure(ch,mode,ink)})};
+  // fantasmas: copias en tinta en las posiciones de los cuadros anteriores
+  for(let g=3;g>=1;g--){const pk=kidPos(t-g/24);if(pk)S.dissolve(.55-g*.13,()=>draw(pk.x,'ink',g>1?'#f2c218':'#ffe680'))}
+  draw(kp.x,'plain');
+  const[sx,sy]=S.toPx(kp.x,LANE.kid+kp.y-20);for(let i=0;i<6;i++){const f=Math.floor(t*24),yy=sy+(hash(f+i)-.5)*30*S.cam.k;S.line(sx-30*S.cam.k,yy,sx-(60+hash(i+f)*90)*S.cam.k,yy,1,'#ffffff')}
+}
+function capybara(t,x,ink){const k=S.cam.k,y0=LANE.capy,f=Math.floor(t*24),ph=f%2;
+  const p=(dx,dy)=>S.toPx(x+dx,y0+dy),col=c=>ink||c;
+  // galope: patas estiradas y recogidas a 24 fps; el cuerpo, un barril con la cabeza cuadrada adelante
+  const legs=ph?[[-26,-10,-40,0],[-18,-10,-30,0],[18,-10,34,0],[24,-10,40,0]]:[[-24,-10,-16,-2],[-18,-10,-10,-2],[18,-10,10,-2],[24,-10,16,-2]];
+  for(const[a,b,c,d]of legs){const[x1,y1]=p(a,b),[x2,y2]=p(c,d);S.line(x1,y1,x2,y2,Math.max(2,6*k),col('#140c08'));S.line(x1,y1,x2,y2,Math.max(1,4*k),col('#5a3a20'))}
+  const body=[];for(let i=0;i<20;i++){const a=i/20*Math.PI*2;body.push(p(Math.cos(a)*36,-24+Math.sin(a)*15))}
+  S.poly(body.map(([bx,by])=>[bx+(bx>p(0,0)[0]?1:-1),by+(by>p(0,-24)[1]?1:-1)]),col('#140c08'));S.poly(body,col('#8a5c36'));
+  if(!ink){const back=[];for(let i=0;i<10;i++){const a=Math.PI+i/9*Math.PI;back.push(p(Math.cos(a)*34,-26+Math.sin(a)*12))}S.poly(back,'#6e4628')}
+  S.poly([p(26,-36),p(52,-34),p(54,-20),p(30,-14)].map(([a,b])=>[a+1,b+1]),col('#140c08'));S.poly([p(26,-36),p(52,-34),p(54,-20),p(30,-14)],col('#8a5c36'));
+  if(!ink){const[ex,ey]=p(42,-30);S.R(ex,ey,Math.max(1,3*k),1,'#140c08');const[nx,ny]=p(50,-30);S.R(nx,ny,Math.max(1,2*k),Math.max(1,2*k),'#2a1a10');const[ax,ay]=p(30,-38);S.R(ax,ay,Math.max(1,3*k),Math.max(1,3*k),'#6e4628')}
+}
+function capy(t){const x=capyX(t);if(x==null)return;
+  for(let g=4;g>=1;g--){const px=capyX(t-g/24);if(px!=null)S.dissolve(.6-g*.12,()=>capybara(t,px,g>2?'#c48a4a':'#ffd8a0'))}
+  capybara(t,x);
+  const k=S.cam.k;for(let i=0;i<10;i++){const d=hash(i)*160,lv=.55*(1-d/160),[px,py]=S.toPx(x-50-d,LANE.capy-4-hash(i+3)*14);S.ditherDisc(px,py,(4+d*.08)*k*2,'#9a8a5a',lv)}
+  const f=Math.floor(t*24);for(let i=0;i<8;i++){const[sx,sy]=S.toPx(x-40,LANE.capy-24+(hash(f+i)-.5)*40);S.line(sx,sy,sx-(80+hash(f*3+i)*160)*k,sy,1,'#fff6e0')}
+}
+
+function render(s){
+  const t=S.t,shakeX=S.cam.cx-S.PW/2,far=plane(.38,.46),mid=plane(.78,.62),near=plane(1.1,.97);
+  sky();
+  withCam(far,houses);
+  withCam(mid,()=>{street();cart(t);kid(t);capy(t);if(s.phase==='hit'){const x=capyX(T.hit),[cx,cy]=S.toPx(x,LANE.capy-20);S.focusLines('#ffffff',40,2,24,cx,cy);S.disc(cx,cy,10,'#ffffff')}});
+  withCam(near,()=>{lawnNear();tufts();sprinkler(50,90,1);sprinkler(-40,150,2);sign()});
+}
+
+// ---------- sonido ----------
+const X=S.sfx;
+const chirp=()=>{for(let i=0;i<3;i++)setTimeout(()=>S.tone(.03,'sine',4400,4300,.05),i*45)};
+const crickets=[];for(let tt=.15;tt<LOOP;tt+=.42)if(tt<3.6||tt>7.6)crickets.push([tt,chirp]);
+const boing=()=>{for(let i=0;i<7;i++)setTimeout(()=>S.tone(.14,'triangle',260-i*8,230-i*8,.16*(1-i/8)),i*110)};
+const sfx=[...crickets,
+  [T.cart0,()=>S.tone(2.5,'sine',180,190,.04)],
+  [3.3,()=>S.tone(.9,'sawtooth',500,900,.035)],
+  [4.1,()=>{S.tone(.55,'sawtooth',1500,650,.12);X.whoosh(.4)}],
+  [T.jump,()=>X.rise(.3)],[T.land,X.thud],
+  [T.capy0,()=>X.whoosh(.25)],[T.hitEnd,()=>{X.boom();S.noise(.8,'bandpass',800,200,.4)}],
+  [T.hitEnd+.05,boing],
+  [T.radio,()=>{S.noise(.25,'bandpass',1800,1600,.25,3);S.tone(.08,'square',1200,1200,.06)}],
+  [9.2,()=>{S.noise(.2,'bandpass',1800,1600,.15,3)}]
+];
+const drone=s=>{const t=S.t,x=cartX(t);return s.freeze!=null?0:x>-330&&x<330?.03:0};
+const ambience=s=>({rain:0,wind:s.freeze!=null?0:.02+gust(S.t)*.25,windFreq:500});
+
+S.start({
+  loop:LOOP,vertical:true,camCy:.5,reducedT:4.2,
+  chars:{guard:GUARD,kid:KID},
+  light:{x:-1000,rim:'#ffc890'},no2dSmears:true,
+  state,render,sfx,drone,ambience,
+  subs:[[7.1,9.1,'—Central… tenemos un carpincho.','本部…カピバラだ']],
+  hook:[],
+  el:{stage:document.getElementById('stage'),canvas:document.getElementById('c'),toggle:document.getElementById('toggle'),
+      sound:document.getElementById('sound'),sub:document.getElementById('sub'),hook:document.getElementById('hook')}
+});
+})();
+</script>
+</body></html>

@@ -378,3 +378,17 @@ Short de 10 s: un gaucho toma mate en la avenida frente al Obelisco, se le viene
 - **Sonido local:** sorbo de bombilla (ráfagas bandpass cortas ascendentes), bocina de dos cuadradas desafinadas, arpegio de cuadradas para el viaje y el final de tango "chan-chán" (acorde corto, después acorde con bajo largo) justo cuando el bondi se detiene.
 - **Impact frames con palabra:** en lugar del kanji, "¡CHE!" con `pixText`. Funciona igual: la palabra se lee en un cuadro.
 - **Loop:** abre y cierra en el primer plano del mate. El vapor tiene período LOOP/5 y la espuma LOOP/5, así el último cuadro es idéntico al primero; el zoom al mate en la mano hace de corte por coincidencia.
+
+---
+
+## 19. Máxima 10 — un solo plano fijo, tres velocidades
+
+Short de 10 s con la cámara clavada: en la calle de un country con cartel de máxima 10, el carrito de seguridad avanza lentísimo, un nene en triciclo lo pasa y salta el lomo de burro, y un carpincho pasa más rápido que los dos. El cartel gira por la ráfaga. "—Central… tenemos un carpincho."
+
+- **Feedback que lo originó:** "Otra Ronda" era argentino de postal (gaucho, mate, Obelisco). Lo que pedía el usuario era el absurdo cotidiano que todos reconocen (clichés de country, carpinchos de Nordelta). Antes de escribir código, armar la escena en texto y dejar que el usuario la dirija.
+- **Planos de profundidad sin mover la cámara** (`plane(escala, alturaDelPiso)` + `withCam`): casas a 0,38, calle a 0,78 y pasto con cartel a 1,1, cada uno con su línea de piso en pantalla. La profundidad sale de la escala, no del movimiento.
+- **`figAt(ch, escala)`:** dibuja una figura más chica (el nene a 0,62) manteniendo su punto de apoyo en el mismo píxel. Recalcula `camX` y `camY` para que el ancla no se corra.
+- **La velocidad se cuenta por contraste en el mismo cuadro:** el carrito se mueve en threes (8 fps) y frena del todo en el lomo de burro; el nene va a 450 unidades/s con pedales a 24 fps y fantasmas; el carpincho, a 1130 unidades/s, con galope a 24 fps, 4 fantasmas, polvo y líneas de velocidad. El cartel fijo es la referencia que todos cruzan.
+- **El entorno muestra la ráfaga:** la gorra del guardia sale volando y vuelve a caer en la cabeza, los yuyos se inclinan y el chorro de los aspersores se desvía (`gust(t)`).
+- **Cartel que gira sobre el poste:** disco dibujado por filas con medio ancho `r·|cos θ|`; con `cos θ < 0` se ve el dorso gris. Tres vueltas con `easeOut` y queda de frente, así el loop cierra.
+- **Ojo al revisar grillas:** contar bien a qué instante corresponde cada recuadro antes de "arreglar" un bug que no existe.
