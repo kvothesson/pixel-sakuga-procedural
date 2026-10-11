@@ -361,3 +361,20 @@ El salto de paradigma recomendado en la sección 13. El mismo pixel art, pero ah
 - **Cut-in:** los ojos van en el centro de la franja y los textos en los bordes, siguiendo la inclinación de la franja.
 - **Grietas sobre un cuerpo:** se dibujan en una capa y se enmascaran con la silueta del personaje.
 - **Composición de grupo:** si dos personajes se tapan, se mueve la cámara (dentro del lado permitido por la regla de 180°) antes que los personajes.
+
+---
+
+## 18. Otra Ronda · Ramal ∞ — spin-off argentino: color cycling y fileteado
+
+Short de 10 s: un gaucho toma mate en la avenida frente al Obelisco, se le viene un colectivo, revolea las boleadoras sin soltar el mate y lo frena a un metro. "—Está lavado." / "—Otra ronda." y vuelve al mate.
+
+- **Viaje en paleta (color cycling):** `trip(level)` lee el buffer, mapea cada píxel por su brillo a la paleta del fileteado (rojo, amarillo, verde, azul, crema, naranja, magenta) y la hace rotar a 12 fps, con una onda diagonal que desplaza el índice y filas que ondulan. Los negros (brillo < 0,09) no se tocan: son el contorno y sostienen la lectura. Entra y sale con dither Bayer.
+- **Lo que no funcionó:** aplicar el viaje a todo el cuadro borra al personaje (se vuelve una mancha de colores). Solución: aplicar el viaje **antes** de dibujar al personaje. El mundo se derrite y él queda nítido, lo que además cuenta el chiste: él está tranquilo.
+- **Fileteado procedural:** `curl()` es una espiral que se cierra y se afina, dibujada con Bresenham y contorno negro (el rulo del filete); `leaf()` es una hoja de acanto con `poly`. El marco va en `post`, así no lo rota la cámara inclinada, y sus colores también ciclan.
+- **Escala sin 3D:** un colectivo de perfil de 250 × 150 unidades contra un personaje de 95. El cuerpo entra a cuadro tarde porque viene de costado, así que **la luz llega antes que el vehículo**: el cono del faro con dither y la bocina anuncian el peligro varios segundos antes.
+- **Frenada creíble:** desaceleración constante desde la velocidad de llegada (`x = stop + D·(1−q)²`, con duración `2D/v`), la trompa que se hunde al frenar y un rebote amortiguado al parar.
+- **Boleadoras sin física:** tres bolas en órbita alrededor de la mano (elipse aplanada si giran sobre la cabeza), con estelas en las posiciones anteriores. En vuelo, la órbita viaja en arco; al pegar, se enroscan en la trompa con radio que decae.
+- **Remate de comedia:** corte a primer plano del cartel de destino (LED con filas oscuras) que pasa de "RAMAL ∞" a "FUERA DE SERVICIO" con un barrido a 24 fps.
+- **Sonido local:** sorbo de bombilla (ráfagas bandpass cortas ascendentes), bocina de dos cuadradas desafinadas, arpegio de cuadradas para el viaje y el final de tango "chan-chán" (acorde corto, después acorde con bajo largo) justo cuando el bondi se detiene.
+- **Impact frames con palabra:** en lugar del kanji, "¡CHE!" con `pixText`. Funciona igual: la palabra se lee en un cuadro.
+- **Loop:** abre y cierra en el primer plano del mate. El vapor tiene período LOOP/5 y la espuma LOOP/5, así el último cuadro es idéntico al primero; el zoom al mate en la mano hace de corte por coincidencia.

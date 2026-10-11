@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Otra Ronda · Ramal ∞</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* Layout: short vertical 9:16 centrado, gancho arriba, subtítulos abajo, controles debajo. Look nocturno fijo (single-theme a propósito), marco en colores de fileteado. */
+:root{
+  --night:#07050d;
+  --ink:#ece8f6;
+  --dim:#8a83a6;
+  --fil-rojo:#d4202c;
+  --fil-amarillo:#f2c218;
+  --fil-verde:#1f8a3a;
+  --f-pixel:"DotGothic16","MS Gothic",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--ink);margin:0}
+body{font-family:var(--f-pixel);padding-inline:16px;padding-block:16px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.stage{position:relative;width:min(100%,calc(82vh * 9 / 16));aspect-ratio:9/16;max-width:100%;overflow:hidden;background:#000;cursor:pointer;border-radius:10px;
+  box-shadow:0 0 0 2px var(--fil-amarillo),0 0 0 4px var(--fil-rojo)}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.hook{position:absolute;top:13%;left:0;right:0;text-align:center;pointer-events:none;font-size:clamp(18px,6vw,30px);letter-spacing:.06em;color:#fff;
+  text-shadow:3px 0 var(--fil-rojo),-3px 0 #000,0 3px #000,0 -3px #000}
+.hook small{display:block;font-size:.5em;color:#ffd84a;letter-spacing:.2em;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000}
+.sub{position:absolute;left:50%;bottom:17%;transform:translateX(-50%);width:92%;text-align:center;pointer-events:none;
+  font-size:clamp(18px,5.5vw,26px);color:#fff;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000,0 -2px #000}
+.sub small{display:block;font-size:.62em;color:#ffd84a;letter-spacing:.1em}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;color:var(--dim);font-size:14px}
+button{font:inherit;color:var(--ink);background:#140d22;border:2px solid #3a2a5c;padding:6px 14px;cursor:pointer;letter-spacing:.06em}
+button:hover{border-color:var(--fil-amarillo);color:#fff}
+button[aria-pressed="true"]{border-color:var(--fil-amarillo);color:#fff}
+button:focus-visible{outline:2px solid var(--fil-amarillo);outline-offset:2px}
+</style>
+</head><body>
+<div class="stage" id="stage">
+  <canvas id="c" aria-label="Short vertical en pixel art: un gaucho toma mate en la avenida frente al Obelisco, revolea las boleadoras sin soltar el mate y frena un colectivo a un metro"></canvas>
+  <div class="hook" id="hook"></div>
+  <div class="sub" id="sub"></div>
+</div>
+<div class="controls">
+  <button id="sound" type="button" aria-pressed="false">♪ ACTIVAR SONIDO</button>
+  <button id="toggle" type="button">❚❚ PAUSA</button>
+</div>
+<script src="../../engine/sakuga.js"></script>
+<script>
+(()=>{
+const S=window.Sakuga,{P,lerp,ease,easeIn,easeOut,clamp,segAt,lerpPose,worldPt,q8,q12,q24,hash,BAYER}=S;
+const LOOP=10.0;
+
+// ---------- personaje: gaucho original (boina, poncho rojo con guarda negra, pañuelo celeste, bombachas) ----------
+const GAUCHO={head:'hair',
+  pal:{coat:'#9a1e24',coatD:'#661218',pants:'#c9bc98',pantsD:'#a19474',boot:'#1c1310',skin:'#c48c62',neck:'#c48c62',glove:'#c48c62',
+       hair:'#1a1412',tip:'#141014',scarf:'#8fd0ff',aura:'#ffd23a',dark:'#7a5a10'},
+  chains:[
+    {key:'poncho',anchor:'chest',off:[-7,3],n:3,len:9,w:[15,19],col:'coat',tip:'tip',tipFrom:2,grav:1.3,wind:.75,damp:.92},
+    {key:'panuelo',anchor:'chest',off:[1,-4],n:4,len:5,w:[4,2],col:'scarf',grav:.9,wind:1,damp:.88}
+  ]};
+
+// poses propias (todas a partir de las del motor, mirando a la derecha)
+const PO={
+  mate:{...P.stance,rE:[13,-58],rH:[19,-69]},
+  mate2:{...P.stance2,rE:[13,-56],rH:[19,-67]},
+  sip:{...P.stance,head:[7,-88],rE:[16,-66],rH:[13,-80]},
+  spin:{...P.stance,rE:[13,-58],rH:[19,-69],lE:[0,-91],lH:[2,-107]},
+  windup:{...P.stance,chest:[-6,-71],head:[-4,-86],rE:[6,-58],rH:[13,-68],lE:[-15,-84],lH:[-31,-93],lK:[-14,-22],lF:[-26,0]},
+  throw:{hip:[2,-42],chest:[14,-70],head:[20,-84],lE:[24,-76],lH:[46,-80],rE:[16,-58],rH:[23,-67],lK:[-16,-21],lF:[-30,0],rK:[19,-24],rF:[29,0]}
+};
+const GX=-60; // el gaucho no se mueve en toda la escena: la gracia es que no se inmuta
+
+// ---------- coreografía ----------
+// M primer plano del mate · W avenida, luces a lo lejos · S sorbo + viaje fileteado · B boleadoras girando, el bondi entra
+// A anticipación · T tiro · H hit-stop · I impact frames · K derrape · F cartel · Q segundo sorbo · Z zoom al mate · M (= cuadro 0)
+const T={W:.9,S:2.4,trip:2.75,B:3.5,A:4.4,T:4.55,H:4.85,I:4.97,K:5.45,stop:6.27,F:6.45,flip:6.95,Q:7.3,sip2:7.45,Z:8.6,M2:9.25};
+const V=240,HIT_X=140,STOP_X=-30,BRAKE=2*(HIT_X-STOP_X)/V; // frena con desaceleración constante
+const busX=t=>t<T.H?HIT_X+V*(T.H-t):STOP_X+(HIT_X-STOP_X)*(1-Math.min(1,(t-T.H)/BRAKE))**2;
+const busDip=t=>t<T.H?0:t<T.H+BRAKE?4*Math.min(1,(t-T.H)/.3):4*Math.exp(-(t-T.H-BRAKE)*4)*Math.cos((t-T.H-BRAKE)*14);
+const tripLevel=t=>t<T.trip||t>=T.A?0:t<T.B?ease(segAt(t,T.trip,T.trip+.45)):1-ease(segAt(t,T.B+.2,T.A));
+const MATE_CAM={zoom:1.45,camX:-45,camY:-92};
+
+function state(t){
+  const t12=q12(t),sg=(a,c)=>segAt(t,a,c),sg12=(a,c)=>segAt(t12,a,c);
+  const breath=Math.floor(q8(t)*2.67)%2?PO.mate2:PO.mate;
+  const g={id:'gaucho',pose:breath,dir:1,x:GX};
+  const s={phase:'M',cam:{},chars:[]};
+  if(t<T.W||t>=T.M2)return s;
+  s.chars=[g];
+  if(t<T.S){s.phase='W';s.cam={zoom:lerp(.72,.8,ease(sg(T.W,T.S))),camX:20,camY:-150}}
+  else if(t<T.B){s.phase='S';g.pose=lerpPose(breath,PO.sip,ease(sg12(T.S,T.S+.25)));
+    const lv=tripLevel(t);s.cam={zoom:lerp(2.6,2.95,ease(sg(T.S,T.B))),camX:-50,camY:-82,rot:lv*.07*Math.sin(t*5.3)}}
+  else if(t<T.H){
+    if(t<T.A){s.phase='B';const k=ease(sg12(T.B,T.B+.15)),c=t12*Math.PI*2*3.5;
+      g.pose=lerpPose(PO.mate,PO.spin,k);if(k>=1){const p={...PO.spin};p.lH=[2+Math.cos(c)*3,-107+Math.sin(c)*1.5];g.pose=p}}
+    else if(t<T.T){s.phase='A';g.pose=PO.windup}
+    else{s.phase='T';g.pose=t12<T.T+1/12?lerpPose(PO.windup,PO.throw,.6):PO.throw} // un solo intermedio, como pose clave
+    s.cam={zoom:lerp(.6,.68,ease(sg(T.B,T.H))),camX:lerp(40,70,ease(sg(T.B,T.H))),camY:-140,shake:sg(T.B+.4,T.H)*3,rot:tripLevel(t)*.05*Math.sin(t*4.1)}}
+  else if(t<T.I){s.phase='H';g.pose=PO.throw;s.freeze=T.H;s.cam={zoom:.68,camX:70,camY:-140}}
+  else if(t<T.K){s.phase='I';g.pose=PO.throw;s.cam={zoom:.68,camX:70,camY:-140,shake:6}}
+  else if(t<T.F){s.phase='K';g.pose=lerpPose(PO.throw,breath,ease(sg12(T.K+.1,T.K+.4)));
+    s.cam={zoom:.95,camX:-10,camY:-100,shake:t<T.stop?5*(1-sg(T.K,T.stop))+1:Math.max(0,2-(t-T.stop)*12)}}
+  else if(t<T.Q){s.phase='F';s.cam={zoom:3.2,camX:STOP_X+58,camY:-143,shake:t>=T.flip&&t<T.flip+.1?2:0}}
+  else if(t<T.Z){s.phase='Q';const up=ease(sg12(T.sip2,T.sip2+.25))*(1-ease(sg12(T.sip2+.75,T.sip2+1)));g.pose=lerpPose(breath,PO.sip,up);
+    s.cam={...MATE_CAM,zoom:lerp(1.45,1.55,sg(T.Q,T.Z))}}
+  else{s.phase='Z';g.pose=PO.mate;const k=easeIn(sg(T.Z,T.M2-.12)),m=worldPt(g,PO.mate.rH);
+    s.cam={zoom:lerp(1.55,9,k),camX:lerp(MATE_CAM.camX,m[0]+1,k),camY:lerp(MATE_CAM.camY,m[1]-3,k)}}
+  return s;
+}
+const wind=t=>t>=T.K&&t<T.F?[-(520*(1-segAt(t,T.K,T.F))+80),-60]:t>=T.B&&t<T.H?[-(120+segAt(t,T.B,T.H)*260),-30]:[-(50+40*Math.sin(t*1.7)),-20];
+
+// ---------- primitivas de fileteado ----------
+const FIL=['#d4202c','#f2c218','#1f8a3a','#1e5fb4','#f4efe0','#e86a1a','#c43a8a'];
+const FIL_RGB=FIL.map(h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)));
+// voluta: espiral que se cierra y se afina (el rulo del fileteado), con contorno negro
+function curl(cx,cy,Rr,turns,a0,dir,w,col){
+  const n=Math.max(14,Math.round(Rr*turns*1.6));
+  for(const[ww,cc]of[[w+2,'#06040a'],[w,col]]){let pv=null;
+    for(let i=0;i<=n;i++){const q=i/n,a=a0+dir*q*turns*Math.PI*2,r=Rr*(1-.82*q),p=[cx+Math.cos(a)*r,cy+Math.sin(a)*r];
+      if(pv)S.line(pv[0],pv[1],p[0],p[1],Math.max(1,ww*(1-.55*q)),cc);pv=p}}
+}
+// hoja de acanto: gota alargada con contorno
+function leaf(x,y,ang,len,wid,col){const ca=Math.cos(ang),sa=Math.sin(ang),pts=[];
+  for(let i=0;i<=8;i++){const q=i/8,r=Math.sin(Math.PI*q)*wid*(1-q*.4);pts.push([x+ca*len*q-sa*r,y+sa*len*q+ca*r])}
+  for(let i=8;i>=0;i--){const q=i/8,r=Math.sin(Math.PI*q)*wid*.35;pts.push([x+ca*len*q+sa*r,y+sa*len*q-ca*r])}
+  const out=pts.map(([px,py])=>[px+(px-x)*.08,py+(py-y)*.08]);S.poly(out,'#06040a');S.poly(pts,col)}
+// marco de fileteado en las cuatro esquinas; los colores rotan (color cycling)
+function filFrame(level){
+  if(level<=0)return;const W=S.PW,H=S.PH,f=Math.floor(S.t*12),g=ease(level),u=Math.min(W,H);
+  const c=i=>FIL[((i+f)%FIL.length+FIL.length)%FIL.length];
+  for(const[sx,sy]of[[1,1],[-1,1],[1,-1],[-1,-1]]){
+    const ox=sx>0?0:W-1,oy=sy>0?0:H-1,base=sx*3+sy*7;
+    curl(ox+sx*u*.17,oy+sy*u*.17,u*.13*g,1.6,sy>0?Math.PI:0,sx*sy,3,c(base));
+    curl(ox+sx*u*.36,oy+sy*u*.07,u*.06*g,1.4,0,-sx*sy,2,c(base+2));
+    curl(ox+sx*u*.07,oy+sy*u*.36,u*.06*g,1.4,Math.PI/2,sx*sy,2,c(base+4));
+    leaf(ox+sx*u*.22,oy+sy*u*.27,Math.atan2(sy*.9,sx*.5),u*.2*g,u*.04*g,c(base+1));
+    leaf(ox+sx*u*.27,oy+sy*u*.2,Math.atan2(sy*.5,sx*.9),u*.2*g,u*.04*g,c(base+3));
+  }
+  const m=Math.round(2+2*g);S.R(m,m,W-2*m,1,c(1));S.R(m,H-m-1,W-2*m,1,c(1));S.R(m,m,1,H-2*m,c(1));S.R(W-m-1,m,1,H-2*m,c(1));
+}
+// viaje: cada píxel se mapea por su brillo a la paleta del fileteado, que rota a 12 fps; las filas ondulan. Los negros quedan (son el contorno).
+function trip(level){
+  if(level<=0)return;const c=S.ctx(),W=S.PW,H=S.PH,img=c.getImageData(0,0,W,H),d=img.data,src=new Uint8ClampedArray(d),f=Math.floor(S.t*12);
+  for(let y=0;y<H;y++){const sh=Math.round(Math.sin(y*.11+f*.7)*3*level);
+    for(let x=0;x<W;x++){const sx=Math.min(W-1,Math.max(0,x+sh)),si=(y*W+sx)*4,o=(y*W+x)*4;let r=src[si],gg=src[si+1],bb=src[si+2];
+      const lum=(r*.3+gg*.59+bb*.11)/255;
+      if(lum>.09&&BAYER[y&3][x&3]/16<level){const idx=((Math.floor(lum*5+f*.5+Math.sin(x*.07+y*.045+f*.4)*1.3)%7)+7)%7;[r,gg,bb]=FIL_RGB[idx]}
+      d[o]=r;d[o+1]=gg;d[o+2]=bb;d[o+3]=255}}
+  c.putImageData(img,0,0);
+}
+
+// ---------- ciudad ----------
+function city(s){
+  const{toPx,wrect,R}=S,cx=s.cam.camX||0;
+  for(let i=-24;i<25;i++){const w=34+hash(i)*30,h=110+hash(i+50)*190,x=i*46+cx*.55;wrect(x,-h,w,h+2,'#0c0918');
+    for(let j=0;j<9;j++)if(hash(i*13+j)>.5){const wx=x+4+hash(i*7+j)*(w-10),wy=-h+8+hash(i*3+j)*(h-20);wrect(wx,wy,3,3,hash(i+j*5)>.65?'#ffb86a':'#5a64b8')}}
+  // el Obelisco: aguja blanca con punta piramidal y ventanita
+  const ox=40+cx*.7,H=400,[bxa,gy]=toPx(ox-13,0),[bxb]=toPx(ox+13,0),[txa,ty]=toPx(ox-8,-H),[txb]=toPx(ox+8,-H),[px,py]=toPx(ox,-H-24);
+  S.poly([[bxa,gy],[bxb,gy],[txb,ty],[txa,ty]],'#a8a2bc');S.poly([[bxa,gy],[(bxa+bxb)/2,gy],[(txa+txb)/2,ty],[txa,ty]],'#d6d2e2');
+  S.poly([[txa,ty],[txb,ty],[px,py]],'#bdb8cc');S.poly([[txa,ty],[(txa+txb)/2,ty],[px,py]],'#e8e4f0');
+  const[wx,wy]=toPx(ox-1.5,-H+16);R(wx,wy,Math.max(1,3*S.cam.k),Math.max(1,4*S.cam.k),'#2a2440');
+  S.ditherDisc(px,py,8*S.cam.k,'#ff3a3a',.35*(Math.floor(S.t*2)%2)); // baliza
+}
+function street(s){
+  const{toPx,R,wrect}=S,[x0,gy]=toPx(-2000,0),[x1]=toPx(2000,0);
+  R(0,gy,S.PW,S.PH-gy,'#121019');R(0,gy,S.PW,1,'#3a3048');
+  for(let i=-30;i<30;i++)wrect(i*44,22,22,2.5,'#6a6458');
+  // faroles: poste, brazo, luz y charco de luz en el piso
+  for(let i=-3;i<5;i++){const x=i*190+40+(s.cam.camX||0)*.12,[a,b2]=toPx(x,0),[c,d]=toPx(x,-215),[e]=toPx(x+20,-215),k=S.cam.k;
+    S.line(a,b2,c,d,Math.max(1,3*k),'#1e1a26');S.line(c,d,e,d,Math.max(1,2*k),'#1e1a26');R(e-4*k,d,8*k,Math.max(1,3*k),'#ffd890');
+    S.ditherDisc(e,d+2*k,30*k,'#ffb45a',.3);S.ditherEllipse(...toPx(x+20,6),40*k,7*k,'#3a2a20',.6)}
+}
+
+// ---------- el colectivo (de perfil, mirando a la izquierda; bx = trompa) ----------
+const BL=250,WHEELS=[48,200];
+function bus(bx,t,ink){
+  const{toPx,poly,R,disc}=S,k=S.cam.k,dip=busDip(t);
+  const p=(x,y)=>toPx(bx+x,y+dip*(1-x/BL));
+  const P_=pts=>pts.map(([x,y])=>p(x,y));
+  const body=[[0,-16],[BL,-16],[BL,-142],[BL-6,-150],[10,-150],[2,-136],[0,-118]];
+  if(ink){poly(P_(body),ink);for(const w of WHEELS){const[cx,cy]=toPx(bx+w,-17);disc(cx,cy,17*k,ink)}return}
+  // contorno: la silueta corrida un píxel en cada dirección
+  const bp=P_(body);for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]])poly(bp.map(([x,y])=>[x+dx,y+dy]),'#06040a');
+  poly(bp,'#e8dcb8');
+  poly(P_([[0,-16],[BL,-16],[BL,-86],[0,-86]]),'#b01e2a');
+  poly(P_([[0,-89],[BL,-89],[BL,-85],[0,-85]]),'#f2c218');poly(P_([[0,-85],[BL,-85],[BL,-83],[0,-83]]),'#1f8a3a');
+  poly(P_([[0,-24],[BL,-24],[BL,-16],[0,-16]]),'#2a1a1a');
+  poly(P_([[10,-150],[BL-6,-150],[BL-4,-147],[8,-147]]),'#c4b48c');
+  // parabrisas con chofer
+  poly(P_([[1,-118],[3,-131],[9,-134],[24,-134],[24,-92],[1,-92]]),'#16233c');poly(P_([[4,-128],[9,-132],[14,-132],[5,-110]]),'#34507c');
+  {const[cx,cy]=p(15,-106);disc(cx,cy,5*k,'#0a0a12')}
+  // ventanillas iluminadas con pasajeros
+  for(let j=0;j<6;j++){const x0=34+j*35;poly(P_([[x0-1,-133],[x0+30,-133],[x0+30,-95],[x0-1,-95]]),'#2a2220');poly(P_([[x0,-132],[x0+29,-132],[x0+29,-96],[x0,-96]]),'#e3a85a');
+    for(let h=0;h<2;h++)if(hash(j*5+h)>.35){const[cx,cy]=p(x0+6+h*14+hash(j+h)*4,-104);disc(cx,cy,5*k,'#3a2214');const[sx,sy]=p(x0+3+h*14,-98);R(sx,sy,10*k,3*k,'#3a2214')}}
+  // cartel de destino
+  {const[sa,sb]=p(26,-150),[sc,sd]=p(92,-136);R(sa,sb+1,sc-sa,sd-sb,'#100804');
+    const flipped=t>=T.flip+.12,wipe=t>=T.flip&&t<T.flip+.12?segAt(t,T.flip,T.flip+.12):-1,mx=(sa+sc)/2,h=sd-sb;
+    if(k>1.6){const amber='#ffae2a';
+      if(!flipped&&wipe<0)S.pixText('RAMAL ∞',mx,sb+h*.55,h*.62,amber);
+      else if(flipped){S.pixText('FUERA DE',mx,sb+h*.32,h*.4,amber);S.pixText('SERVICIO',mx,sb+h*.75,h*.4,amber)}
+      else R(sa,sb+1+h*wipe,sc-sa,Math.max(1,k*1.5),amber);
+      for(let y=Math.round(sb)+2;y<sd;y+=2)R(sa,y,sc-sa,1,'rgba(16,8,4,.55)')} // filas del LED
+    else for(let i=0;i<7;i++)R(sa+3*k+i*(sc-sa-6*k)/7,sb+h*.35,Math.max(1,(sc-sa)/12),Math.max(1,h*.35),flipped?'#ff6a2a':'#ffae2a')}
+  // fileteado del costado: rulos, hojas y el número
+  {const kk=k;const[a1,b1]=p(110,-56),[a2,b2]=p(170,-56);curl(a1,b1,10*kk,1.5,Math.PI,1,Math.max(1,2*kk),'#f2c218');curl(a2,b2,10*kk,1.5,0,-1,Math.max(1,2*kk),'#f2c218');
+    leaf(a1+8*kk,b1+2*kk,0,22*kk,4*kk,'#1f8a3a');leaf(a2-8*kk,b2+2*kk,Math.PI,22*kk,4*kk,'#1f8a3a');
+    const[nx,ny]=p(62,-55);S.pixText('∞',nx,ny,Math.max(8,26*kk),'#f2c218')}
+  // trompa: paragolpes, faro, giro
+  poly(P_([[-3,-30],[16,-30],[16,-22],[-3,-22]]),'#3c3c44');
+  poly(P_([[-1,-41],[5,-41],[5,-33],[-1,-33]]),'#fff6c8');poly(P_([[-1,-47],[3,-47],[3,-44],[-1,-44]]),'#ff9a2a');
+  // ruedas: los rayos giran según lo recorrido
+  const ang=-(busX(t))/17;
+  for(const w of WHEELS){const[cx,cy]=toPx(bx+w,-17);disc(cx,cy,20*k,'#120c0c');disc(cx,cy,17*k,'#0a0808');disc(cx,cy,9*k,'#8a8a96');
+    for(let i=0;i<4;i++){const a=ang+i*Math.PI/2;S.line(cx,cy,cx+Math.cos(a)*8*k,cy+Math.sin(a)*8*k,Math.max(1,1.5*k),'#4a4a56')}disc(cx,cy,3*k,'#d8d8e0')}
+}
+// cono del faro: dither sobre el piso y el aire, hacia la izquierda
+function headlight(bx,lv,t){if(lv<=0)return;const[hx,hy]=S.toPx(bx-1,-37+busDip(t)),k=S.cam.k;
+  S.dissolve(lv*.35,()=>S.poly([[hx,hy-3*k],[hx-260*k,hy-60*k],[hx-260*k,hy+60*k],[hx,hy+3*k]],'#fff2b0'));
+  S.ditherDisc(hx,hy,14*k,'#fffbe0',lv*.9)}
+
+// ---------- mate y boleadoras (encima del personaje) ----------
+function mate(ch){
+  const k=S.cam.k,pose=S.plantPose(ch),[mx,my]=S.toPx(...worldPt(ch,pose.rH)),sipping=pose.rH[1]<-76;
+  const r=4.6*k,cy=my-1.5*k;
+  S.disc(mx,cy,r+1,'#06040a');S.disc(mx,cy,r,'#6b3a1c');S.disc(mx-r*.35,cy-r*.3,r*.45,'#8e5428');
+  S.R(mx-r*.8,cy-r*.95,r*1.6,Math.max(1,k*1.1),'#c8ccd4'); // virola
+  const[hx,hy]=S.toPx(...worldPt(ch,[pose.head[0]+5,pose.head[1]+4])),tx=sipping?hx:mx+5*k,ty=sipping?hy:cy-9*k;
+  S.line(mx+r*.2,cy-r*.8,tx,ty,Math.max(1,k*1.2),'#d0d4dc');
+}
+function boina(ch){
+  const k=S.cam.k,pose=S.plantPose(ch),[hx,hy]=S.toPx(...worldPt(ch,[pose.head[0]-1,pose.head[1]-7])),rx=10.5*k,ry=3.6*k,tilt=-.12;
+  const ell=(ex,ey)=>{const o=[];for(let i=0;i<16;i++){const a=i/16*Math.PI*2,x=Math.cos(a)*(rx+ex),y=Math.sin(a)*(ry+ey);o.push([hx+x*Math.cos(tilt)-y*Math.sin(tilt),hy+x*Math.sin(tilt)+y*Math.cos(tilt)])}return o};
+  S.poly(ell(1,1),'#06040a');S.poly(ell(0,0),'#1d1a26');S.R(hx-rx*.5,hy-ry*.7,rx*.9,1,'#3a3450');S.R(hx-1,hy-ry-1.5*k,Math.max(1,1.5*k),Math.max(1,1.5*k),'#1d1a26');
+  const[mx,my]=S.toPx(...worldPt(ch,[pose.head[0]+5,pose.head[1]+3]));S.R(mx-1.5*k,my,Math.max(2,4*k),Math.max(1,1.2*k),'#2a1a12'); // bigote
+}
+function bolasState(t,ch){
+  if(t<T.B||t>=T.F)return null;
+  if(t<T.T){const pose=S.plantPose(ch),h=worldPt(ch,pose.lH);return{c:h,r:t<T.A?24:12,a:q24(t)*Math.PI*2*3.5,flat:.38}}
+  const tgt=[busX(T.H)-2,-40];
+  if(t<T.H){const h=worldPt({...ch,pose:PO.throw},PO.throw.lH),q=segAt(q24(t),T.T,T.H);return{c:[lerp(h[0],tgt[0],q),lerp(h[1],tgt[1],q)-Math.sin(Math.PI*q)*16],r:14,a:q24(t)*Math.PI*2*5,flat:.8}}
+  const dk=segAt(t,T.H,T.K);return{c:[busX(t)-2,-40+busDip(t)],r:lerp(14,5,ease(dk)),a:T.H*Math.PI*2*5+(1-Math.exp(-(t-T.H)*3))*20,flat:.9,wrapped:true}
+}
+function bolas(st,trail){
+  if(!st)return;const k=S.cam.k,[cx,cy]=S.toPx(...st.c);
+  const pos=(a,i)=>{const aa=a+i*Math.PI*2/3,rr=st.r*(.86+.12*i);return[cx+Math.cos(aa)*rr*k,cy+Math.sin(aa)*rr*k*st.flat]};
+  if(trail&&!st.wrapped)for(let g=3;g>=1;g--)for(let i=0;i<3;i++){const[x,y]=pos(st.a-g*.45,i);S.ditherDisc(x,y,3.5*k+1,'#ffd23a',.55-g*.14)}
+  for(let i=0;i<3;i++){const[x,y]=pos(st.a,i);S.line(cx,cy,x,y,1,'#d8c08a')}
+  if(st.wrapped)for(let i=0;i<3;i++)S.ring(cx,cy,(st.r*.6+i*1.5)*k,(st.r*.5+i)*k*st.flat,'#d8c08a');
+  for(let i=0;i<3;i++){const[x,y]=pos(st.a,i),r=Math.max(1.5,3*k);S.disc(x,y,r+1,'#06040a');S.disc(x,y,r,'#5a4c40');S.R(x-r*.5,y-r*.5,Math.max(1,r*.5),1,'#a8987e')}
+}
+
+// ---------- primer plano del mate (abre y cierra el loop: depende solo de funciones periódicas) ----------
+function closeMate(){
+  const W=S.PW,H=S.PH,{R,disc,ditherDisc}=S,f=Math.floor(S.t*12);
+  R(0,0,W,H,'#0b0710');
+  for(let i=0;i<16;i++){const x=hash(i*3)*W,y=hash(i*7)*H*.55,r=4+hash(i+2)*9,tw=.25+.15*Math.sin(S.t*Math.PI*2/LOOP*(2+i%3)+i);
+    ditherDisc(x,y,r,i%3?'#ffb45a':'#5a64b8',tw)}
+  const cx=W*.5,cy=H*.66,rw=W*.3;
+  // calabaza: contorno, cuerpo, luz del farol a la izquierda, sombra a la derecha
+  disc(cx,cy,rw+2,'#06040a');disc(cx,cy,rw,'#5e3218');disc(cx+rw*.25,cy+rw*.2,rw*.75,'#43230f');disc(cx-rw*.3,cy-rw*.25,rw*.45,'#8e5428');
+  R(cx-rw*.62,cy-rw*.5,2,rw*.5,'#c27a3a');
+  // boca: virola de alpaca, yerba con espuma
+  const oy=cy-rw*.62,orx=rw*.62,ory=rw*.17,ell=(rx,ry)=>{const o=[];for(let i=0;i<20;i++){const a=i/20*Math.PI*2;o.push([cx+Math.cos(a)*rx,oy+Math.sin(a)*ry])}return o};
+  S.poly(ell(orx+2,ory+2),'#06040a');S.poly(ell(orx,ory),'#c8ccd4');S.poly(ell(orx-2,ory-1.5),'#4f7a2a');
+  S.R(cx-orx+2,oy-ory+1,orx*1.6,1,'#eef0f6');
+  for(let i=0;i<9;i++){const a=hash(i)*Math.PI*2,rr=hash(i+4)*.8,bx=cx+Math.cos(a)*(orx-3)*rr,by=oy+Math.sin(a)*(ory-2)*rr,live=Math.sin(S.t*Math.PI*2/LOOP*5+i*1.7)>-.2;
+    if(live)R(bx,by,2,1,'#b8d070')}
+  // bombilla de alpaca con boquilla dorada
+  const b0=[cx+orx*.25,oy],b1=[cx+rw*.7,oy-rw*1.05];S.line(b0[0],b0[1],b1[0],b1[1],5,'#06040a');S.line(b0[0],b0[1],b1[0],b1[1],3,'#c8ccd4');
+  S.line(b0[0]-1,b0[1]-1,b1[0]-1,b1[1]-1,1,'#ffffff');S.line(b1[0]-2,b1[1]+1,b1[0]+3,b1[1]-2,4,'#d8b04a');
+  // vapor: período LOOP/5, cierra el loop
+  const per=LOOP/5;for(let i=0;i<7;i++){const ph=((S.t+i*per/7)%per)/per,x=cx+(hash(i)-.5)*orx*1.2+Math.sin(ph*6+i)*6,y=oy-ph*H*.45,lv=.5*(1-ph)*Math.min(1,ph*6);
+    ditherDisc(x,y,4+ph*16,'#d8d4e0',lv)}
+}
+
+// ---------- impact frames del bondi: blanco/negro/rojo a 24 fps, con "¡CHE!" ----------
+function impactChe(s){
+  const f=Math.floor((S.t-T.I)*24),m=Math.floor(f/2)%3,bg=['#f4f1ec','#05040a','#d4202c'][m],ink=['#05040a','#f4f1ec','#05040a'][m];
+  S.R(0,0,S.PW,S.PH,bg);const[cx,cy]=S.toPx(HIT_X-2,-40);S.focusLines(ink,70,2,24,cx,cy);
+  const gy=S.toPx(0,0)[1];S.R(0,gy,S.PW,S.PH-gy,ink);
+  bus(busX(S.t),S.t,ink);for(const ch of s.chars)S.figure(ch,'ink',ink);
+  for(let i=0;i<16;i+=2){const a=i/16*Math.PI*2+f,r=(22+hash(f*5+i)*16)*S.cam.k*2;S.line(cx,cy,cx+Math.cos(a)*r,cy+Math.sin(a)*r,2,bg)}
+  if(m!==1)S.pixText('¡CHE!',S.PW*.5,S.PH*(Math.floor(f/2)%2?.3:.22),Math.min(S.PW,S.PH)*.3,ink);
+}
+
+function render(s){
+  const t=S.t;
+  if(s.phase==='M'){closeMate();return}
+  if(s.phase==='I'){impactChe(s);return}
+  const g=s.chars[0],bx=busX(t);
+  S.sky(['#05040c','#0a0820','#141030','#221638','#3a1c3a']);
+  city(s);street(s);
+  const near=clamp(1-(bx-STOP_X)/700);
+  // las luces del bondi llegan antes que el bondi
+  if(s.phase==='W'){const lv=ease(segAt(t,T.W+.6,T.S));const[,gy]=S.toPx(0,0);S.dissolve(lv*.4,()=>S.poly([[S.PW,gy-30],[S.PW*.35,gy+6],[S.PW,gy+30]],'#fff2b0'));S.ditherDisc(S.PW-1,gy-4,10,'#fffbe0',lv)}
+  const busOn=t>=T.B&&s.phase!=='W';
+  if(busOn){headlight(bx,.5+near*.5,t);bus(bx,t)}
+  // durante el viaje el mundo se derrite pero el gaucho queda nítido: se aplica el viaje antes de dibujarlo
+  const lv=tripLevel(t);if(lv>0){S.wetFloor(S.toPx(0,0)[1],{strength:.42,amp:1});trip(lv*.85)}
+  S.shadow(g);
+  const lights=busOn?[{x:bx-1,y:-37,c:[255,236,180],r:40+near*40,i:near*.8}]:[];
+  if(tripLevel(t)>0)lights.push({x:g.x,y:-70,c:[255,210,60],r:30,i:tripLevel(t)*.5});
+  S.litCast([{ch:g}],lights);boina(g);mate(g);
+  bolas(bolasState(t,g),s.phase==='B'||s.phase==='A'||s.phase==='T');
+  if(s.phase==='B'&&t>T.B+.5)S.speedLines(0,Math.round(24*segAt(t,T.B+.5,T.A)),'#e8dcb8');
+  if(s.phase==='T')S.speedLines(0,30,'#ffffff');
+  if(s.phase==='K'||s.phase==='Q'&&t<T.Q+.2){const pw=t<T.stop?1-segAt(t,T.K,T.stop)*.6:0;for(const w of WHEELS)S.skidSparks(bx+w,-1,pw,w);
+    for(let i=0;i<10;i++){const ph=(t-T.K)*.6+hash(i)*.3,lv=.5-ph*.35;if(lv<=0)continue;for(const w of WHEELS){const[px,py]=S.toPx(bx+w+20+hash(i+w)*50+ph*30,-ph*50-6);S.ditherDisc(px,py,(6+ph*30)*S.cam.k,'#6a6474',lv)}}}
+  if(s.phase==='H'){const[cx,cy]=S.toPx(HIT_X-2,-40);S.disc(cx,cy,9*S.cam.k,'#ffffff')}
+  if(lv<=0)S.wetFloor(S.toPx(0,0)[1],{strength:.42,amp:1});
+}
+function post(s){filFrame(tripLevel(S.t))}
+
+// ---------- sonido ----------
+const X=S.sfx;
+const slurp=()=>{for(let i=0;i<5;i++)setTimeout(()=>S.noise(.09,'bandpass',500+i*180,1400+i*200,.3,4),i*70);S.noise(.5,'bandpass',300,900,.18,2)};
+const bocina=(v=.12)=>{S.tone(.45,'square',330,326,v);S.tone(.45,'square',415,411,v*.8)};
+const tango=(big)=>{for(const f of[220,261.6,329.6])S.tone(big?.38:.14,'sawtooth',f,f*.99,.09);S.tone(big?.5:.16,'square',big?55:110,big?54:109,.18);if(big)X.thud()};
+const trippy=()=>{const notes=[440,523,587,659,784,880,784,659,587,523,659,880,1047];notes.forEach((n,i)=>setTimeout(()=>{S.tone(.12,'square',n,n*1.03,.05);S.tone(.12,'triangle',n*1.5,n*1.48,.04)},i*65));X.rise(.7)};
+const whirl=[];for(let tt=T.B+.15;tt<T.A;tt+=1/3.5)whirl.push([tt,()=>X.swish()]);
+const sfx=[
+  [.1,()=>S.noise(1.4,'highpass',3000,5000,.05,1,true)],
+  [T.W+.4,()=>bocina(.04)],[T.W+1.1,()=>{bocina(.07);setTimeout(()=>bocina(.07),220)}],
+  [T.S+.12,slurp],[T.trip,trippy],
+  ...whirl,[T.B+.5,()=>{bocina(.18);setTimeout(()=>bocina(.18),180)}],
+  [T.A,()=>X.inhale(.15)],[T.T,()=>X.whoosh(.3)],
+  [T.I,()=>{X.boom();S.tone(.5,'square',900,300,.12);X.crack()}],
+  [T.K,()=>{X.scrape(1.1);S.tone(.9,'triangle',2600,2350,.12);S.tone(.9,'triangle',2650,2380,.08)}],
+  [T.stop,()=>tango(false)],[T.stop+.24,()=>tango(true)],
+  [T.flip,X.tap],[T.Q,()=>S.noise(.7,'highpass',3500,1400,.3)],
+  [T.sip2+.1,slurp],[T.Z+.1,()=>X.whoosh(.6)],
+  [T.M2+.1,()=>S.noise(1.4,'highpass',3000,5000,.05,1,true)]
+];
+const drone=s=>({W:.04,S:.05,B:.12+segAt(S.t,T.B,T.A)*.2,A:.32,T:.34,H:0,I:0,K:.25*(1-segAt(S.t,T.K,T.stop))+.04,F:.03,Q:.05,Z:.03}[s.phase]??0);
+const ambience=s=>{const hush=s.freeze!=null||s.phase==='I';return{rain:0,wind:hush?0:s.phase==='K'?.22:.03,windFreq:s.phase==='K'?520:300}};
+
+S.start({
+  loop:LOOP,vertical:true,camCy:.5,reducedT:3.8,
+  chars:{gaucho:GAUCHO},
+  light:{x:300,rim:'#ffd890'},
+  state,wind,render,post,sfx,drone,ambience,
+  subs:[[7.95,8.75,'—Está lavado.','出がらしだ'],[8.75,9.65,'—Otra ronda.','もう一杯']],
+  hook:[[0,T.W,'¿UN MATECITO?','マテ、いる？']],
+  el:{stage:document.getElementById('stage'),canvas:document.getElementById('c'),toggle:document.getElementById('toggle'),
+      sound:document.getElementById('sound'),sub:document.getElementById('sub'),hook:document.getElementById('hook')}
+});
+})();
+</script>
+</body></html>
