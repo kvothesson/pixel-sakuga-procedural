@@ -52,25 +52,25 @@ const RADIO={...SEAT,rE:[14,-68],rH:[9,-80]};
 
 // ---------- coreografía en un solo plano fijo ----------
 // tres velocidades en el mismo cuadro: carrito lento y continuo, nene con pedales a 24 fps, carpincho con fantasmas
-const T={cart0:.8,kid0:3.7,jump:4.41,land:5.0,capy0:5.75,hit:6.0,hitEnd:6.12,radio:6.9,cartOut:9.6};
+const T={cart0:.3,kid0:3.4,jump:4.5,land:5.1,capy0:5.75,hit:6.0,hitEnd:6.12,radio:6.9,cartOut:9.8};
 const BUMP_X=0,LANE={cart:0,kid:24,capy:40};
 const bump=x=>5*Math.max(0,1-((x-BUMP_X)/16)**2);
 function cartX(t){ // continuo: a esta velocidad, cuantizar a 8 fps se lee como que la escena se tilda
-  if(t<T.cart0)return -460;
-  if(t<5.0)return lerp(-360,-78,(t-T.cart0)/(5.0-T.cart0));
-  if(t<5.3)return -78;                                  // frena del todo antes del lomo
-  if(t<6.6)return lerp(-78,12,ease((t-5.3)/1.3));        // lo sube a paso de hombre
-  return lerp(12,380,(t-6.6)/(T.cartOut-6.6))}
-const CART_L=120,KID_V=450,CAPY_V=1130;
+  if(t<T.cart0)return -260;
+  if(t<4.7)return lerp(-240,-78,(t-T.cart0)/(4.7-T.cart0)); // ~37 u/s: a paso de hombre
+  if(t<5.1)return -78;                                  // frena del todo antes del lomo
+  if(t<6.6)return lerp(-78,12,ease((t-5.1)/1.5));        // lo sube despacito
+  return lerp(12,250,(t-6.6)/(T.cartOut-6.6))}
+const CART_L=120,KID_V=200,CAPY_V=720; // la bici, unas 5 veces el carrito pero visible; el carpincho, el único rapidísimo
 function kidPos(t){
-  if(t<T.kid0||t>5.3)return null;
-  if(t<T.jump)return{x:-330+KID_V*(t-T.kid0),y:0,rot:0};
-  if(t<T.land){const q=(t-T.jump)/(T.land-T.jump);return{x:lerp(0,KID_V*(T.land-T.jump),q),y:-Math.sin(Math.PI*q)*90,rot:-.35*Math.cos(Math.PI*q)}}
+  if(t<T.kid0||t>6.0)return null;
+  if(t<T.jump)return{x:-KID_V*(T.jump-T.kid0)+KID_V*(t-T.kid0),y:0,rot:0};
+  if(t<T.land){const q=(t-T.jump)/(T.land-T.jump);return{x:lerp(0,KID_V*(T.land-T.jump),q),y:-Math.sin(Math.PI*q)*50,rot:-.35*Math.cos(Math.PI*q)}}
   return{x:KID_V*(T.land-T.jump)+KID_V*(t-T.land),y:0,rot:0}}
-const capyX=t=>t<T.capy0||t>6.6?null:-340+CAPY_V*(t-T.capy0);
+const capyX=t=>t<T.capy0||t>6.6?null:-260+CAPY_V*(t-T.capy0);
 const signAngle=t=>t<T.hitEnd?0:t<7.6?Math.PI*2*3.2*(1-Math.exp(-(t-T.hitEnd)*2.2))/(1-Math.exp(-1.5*2.2))*Math.min(1,1):0;
 function signRot(t){if(t<T.hitEnd||t>=7.6)return 0;const q=(t-T.hitEnd)/(7.6-T.hitEnd);return Math.PI*2*3*easeOut(q)} // tres vueltas que frenan y quedan de frente
-const gust=t=>Math.max(t>4.05&&t<4.7?1-(t-4.05)/.65:0,t>T.hit&&t<6.9?1-(t-T.hit)/.9:0);
+const gust=t=>Math.max(t>3.95&&t<4.6?1-(t-3.95)/.65:0,t>T.hit&&t<6.9?1-(t-T.hit)/.9:0);
 
 function state(t){
   const s={phase:'calle',cam:{zoom:.85,shake:t>=T.hitEnd&&t<6.3?4*(1-segAt(t,T.hitEnd,6.3)):0},chars:[]};
@@ -148,7 +148,7 @@ function cart(t){const x=cartX(t),k=S.cam.k,y0=LANE.cart,lift=-(bump(x-40)+bump(
 }
 // la gorra del guardia: la ráfaga del nene se la levanta y vuelve a caer en su cabeza
 function capPos(t,h){let off=0,dx=0;const k=S.cam.k;
-  for(const[t0,dur,hgt]of[[4.12,.55,34],[T.hitEnd,.7,52]])if(t>=t0&&t<t0+dur){const q=(t-t0)/dur;off=Math.sin(Math.PI*q)*hgt;dx=Math.sin(Math.PI*2*q)*6}
+  for(const[t0,dur,hgt]of[[4.0,.55,26],[T.hitEnd,.7,52]])if(t>=t0&&t<t0+dur){const q=(t-t0)/dur;off=Math.sin(Math.PI*q)*hgt;dx=Math.sin(Math.PI*2*q)*6}
   return[h[0]+dx*k,h[1]-off*k]}
 function kid(t){const kp=kidPos(t);if(!kp)return;
   const a=q24(t)*Math.PI*2*7,hub=[12,-14],pedal=s=>[hub[0]+Math.cos(a+s)*6,hub[1]+Math.sin(a+s)*6],lF=pedal(0),rF=pedal(Math.PI);
@@ -163,9 +163,8 @@ function kid(t){const kp=kidPos(t);if(!kp)return;
       S.line(a1,b1,a2,b2,Math.max(1,3*K),col('#d4202c'));S.line(a1,b1,a3,b3,Math.max(1,3*K),col('#d4202c'));S.line(a2,b2,a4,b4,Math.max(1,2*K),col('#9a9aa6'));
       {const[cx,cy]=w(hub);S.disc(cx,cy,14*K+1,col('#111'));S.disc(cx,cy,10*K,col('#d8d8d8'));S.disc(cx,cy,3*K,col('#d4202c'))}
       S.figure(ch,mode,ink)})};
-  // fantasmas: copias en tinta en las posiciones de los cuadros anteriores
   // fantasmas en tinta sólida, cada vez más oscuros (el dither se leía como ruido a esta escala)
-  for(let g=3;g>=1;g--){const pk=kidPos(t-g/24);if(pk)draw(pk.x,'ink',['#ffe680','#d8a818','#8a6a10'][g-1])}
+  {const pk=kidPos(t-2/24);if(pk)draw(pk.x,'ink','#e8c040')} // a velocidad de bici alcanza con un fantasma
   draw(kp.x,'plain');
   const[sx,sy]=S.toPx(kp.x,LANE.kid+kp.y-20);for(let i=0;i<6;i++){const f=Math.floor(t*24),yy=sy+(hash(f+i)-.5)*30*S.cam.k;S.line(sx-30*S.cam.k,yy,sx-(60+hash(i+f)*90)*S.cam.k,yy,1,'#ffffff')}
 }
@@ -202,8 +201,8 @@ const crickets=[];for(let tt=.15;tt<LOOP;tt+=.42)if(tt<3.6||tt>7.6)crickets.push
 const boing=()=>{for(let i=0;i<7;i++)setTimeout(()=>S.tone(.14,'triangle',260-i*8,230-i*8,.16*(1-i/8)),i*110)};
 const sfx=[...crickets,
   [T.cart0,()=>S.tone(2.5,'sine',180,190,.04)],
-  [3.3,()=>S.tone(.9,'sawtooth',500,900,.035)],
-  [4.1,()=>{S.tone(.55,'sawtooth',1500,650,.12);X.whoosh(.4)}],
+  [3.1,()=>S.tone(.9,'sawtooth',500,800,.03)],
+  [3.95,()=>{S.tone(.8,'sawtooth',900,600,.08);X.whoosh(.6)}],
   [T.jump,()=>X.rise(.3)],[T.land,X.thud],
   [T.capy0,()=>X.whoosh(.25)],[T.hitEnd,()=>{X.boom();S.noise(.8,'bandpass',800,200,.4)}],
   [T.hitEnd+.05,boing],
